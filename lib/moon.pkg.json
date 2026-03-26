@@ -1,0 +1,27 @@
+{
+  "import": [
+    "moonbit-community/sqlite3"
+  ],
+  "export": [
+    "open",
+    "close",
+    "set_config",
+    "get_config",
+    "insert_issue",
+    "get_issue_by_id",
+    "list_issues",
+    "get_ready_issues",
+    "update_issue_status",
+    "update_issue_title",
+    "update_issue_priority",
+    "defer_issue",
+    "init_workspace",
+    "make_issue",
+    "generate_issue_id",
+    "status_to_string",
+    "string_to_status",
+    "issue_type_to_string",
+    "string_to_issue_type",
+    "run_all_tests"
+  ]
+}

@@ -1,0 +1,7 @@
+import {
+  "utenadev/beads_mbt/lib" @lib,
+}
+
+options(
+  "is-main": true,
+)

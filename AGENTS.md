@@ -1,0 +1,148 @@
+# Project Agents.md Guide
+
+This is a [MoonBit](https://docs.moonbitlang.com) project.
+
+You can browse and install extra skills here:
+<https://github.com/moonbitlang/skills>
+
+## Project Structure
+
+- MoonBit packages are organized per directory; each directory contains a
+  `moon.pkg` file listing its dependencies. Each package has its files and
+  blackbox test files (ending in `_test.mbt`) and whitebox test files (ending in
+  `_wbtest.mbt`).
+
+- In the toplevel directory, there is a `moon.mod.json` file listing module
+  metadata.
+
+## Coding convention
+
+- MoonBit code is organized in block style, each block is separated by `///|`,
+  the order of each block is irrelevant. In some refactorings, you can process
+  block by block independently.
+
+- Try to keep deprecated blocks in file called `deprecated.mbt` in each
+  directory.
+
+## Tooling
+
+- `moon fmt` is used to format your code properly.
+
+- `moon ide` provides project navigation helpers like `peek-def`, `outline`, and
+  `find-references`. See $moonbit-agent-guide for details.
+
+- `moon info` is used to update the generated interface of the package, each
+  package has a generated interface file `.mbti`, it is a brief formal
+  description of the package. If nothing in `.mbti` changes, this means your
+  change does not bring the visible changes to the external package users, it is
+  typically a safe refactoring.
+
+- In the last step, run `moon info && moon fmt` to update the interface and
+  format the code. Check the diffs of `.mbti` file to see if the changes are
+  expected.
+
+- Run `moon test` to check tests pass. MoonBit supports snapshot testing; when
+  changes affect outputs, run `moon test --update` to refresh snapshots.
+
+- Prefer `assert_eq` or `assert_true(pattern is Pattern(...))` for results that
+  are stable or very unlikely to change. Use snapshot tests to record current
+  behavior. For solid, well-defined results (e.g. scientific computations),
+  prefer assertion tests. You can use `moon coverage analyze > uncovered.log` to
+  see which parts of your code are not covered by tests.
+
+## Native CLI Development Patterns (from actrun)
+
+### Main Function Signature
+```moonbit
+async fn main(cli_args : Array[String]) -> Int {
+  if cli_args.length() < 2 {
+    println(usage_text())
+    return 0
+  }
+  let command = cli_args[1]
+  match command {
+    "init" => handle_init_command()
+    "create" => handle_create_command(cli_args)
+    // ...
+    _ => {
+      println("unknown command: " + command)
+      1
+    }
+  }
+}
+```
+
+### CLI Argument Parsing Pattern
+```moonbit
+struct CliParseResult {
+  options : CliOptions?
+  errors : Array[String]
+}
+
+fn parse_cli_args(args : Array[String]) -> CliParseResult {
+  let errors : Array[String] = []
+  let mut workflow_path = ""
+  let mut index = 1
+  
+  while index < args.length() {
+    let arg = args[index]
+    if arg == "--dry-run" { dry_run = true; index += 1; continue }
+    if arg == "--repo" {
+      if index + 1 >= args.length() { 
+        errors.push("missing value for " + arg)
+        break 
+      }
+      repo_root = Some(args[index + 1])
+      index += 2
+      continue
+    }
+    index += 1
+  }
+  
+  if errors.length() > 0 { return { options: None, errors } }
+  { options: Some({ workflow_path, repo_root, ... }), errors }
+}
+```
+
+### Error Handling Pattern
+- Use `struct { options : T?, errors : Array[String] }` for CLI parsing results
+- Accumulate errors in an array, return all at once
+- Use `try/catch/noraise` for exception handling:
+  ```moonbit
+  let content = try @xfs.read_file_to_string(config_path)
+  catch { _ => return default_config() }
+  noraise { value => value }
+  ```
+
+### Module Imports (moon.pkg)
+```moonpkg
+import {
+  "moonbitlang/x/sys" @xsys,
+  "moonbitlang/x/fs" @xfs,
+  "moonbitlang/core/env" @env,
+  "moonbitlang/core/json" @json,
+  "moonbitlang/core/strconv" @strconv,
+  "moonbitlang/async",
+}
+```
+
+### Useful Packages
+- `moonbitlang/x/sys` (@xsys): System operations (env vars, exit codes)
+- `moonbitlang/x/fs` (@xfs): Filesystem operations
+- `moonbitlang/core/env` (@env): Environment variables, current directory
+- `moonbitlang/async`: Async runtime
+- `moonbit-community/sqlite3`: SQLite bindings
+
+### moon.mod.json Configuration
+```json
+{
+  "name": "username/project",
+  "version": "0.1.0",
+  "deps": {
+    "moonbitlang/x": "0.4.40",
+    "moonbitlang/async": "0.16.6"
+  },
+  "preferred-target": "native",
+  "source": "src"
+}
+```
