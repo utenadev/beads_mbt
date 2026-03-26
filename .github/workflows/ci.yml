@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MoonBit
+      uses: hustcer/setup-moonbit@v1
+      with:
+        version: latest
+    
+    - name: Verify MoonBit installation
+      run: moon version --all
+    
+    - name: Build native binary
+      run: moon build cmd/main --target native
+    
+    - name: Run tests
+      run: moon test lib
+    
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: beads-mbt-linux
+        path: _build/native/release/build/cmd/main/main.exe
+        if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MoonBit
+      uses: hustcer/setup-moonbit@v1
+      with:
+        version: latest
+    
+    - name: Build native binary
+      run: moon build cmd/main --target native
+    
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: beads-mbt-macos
+        path: _build/native/release/build/cmd/main/main.exe
+        if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MoonBit
+      uses: hustcer/setup-moonbit@v1
+      with:
+        version: latest
+    
+    - name: Build native binary
+      run: moon build cmd/main --target native
+    
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: beads-mbt-windows
+        path: _build/native/release/build/cmd/main/main.exe
+        if-no-files-found: error
