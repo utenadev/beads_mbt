@@ -18,6 +18,9 @@ jobs:
       with:
         version: latest
     
+    - name: Update MoonBit registry
+      run: moon update
+    
     - name: Verify MoonBit installation
       run: moon version --all
     
@@ -45,6 +48,9 @@ jobs:
       with:
         version: latest
     
+    - name: Update MoonBit registry
+      run: moon update
+    
     - name: Build native binary
       run: moon build cmd/main --target native
     
@@ -65,6 +71,9 @@ jobs:
       uses: hustcer/setup-moonbit@v1
       with:
         version: latest
+    
+    - name: Update MoonBit registry
+      run: moon update
     
     - name: Build native binary
       run: moon build cmd/main --target native
