@@ -282,6 +282,96 @@ pub fn defer_issue(storage : BeadsStorage, id : String) -> Result[Unit, String] 
   update_issue_status(storage, id, "deferred")
 }
 
+// ============================================================================
+// Dependencies
+// ============================================================================
+
+///|
+/// Add a dependency (issue depends on depends_on)
+pub fn add_dependency(storage : BeadsStorage, issue : String, depends_on : String) -> Result[Unit, String] {
+  let stmt = try storage.conn.prepare("INSERT OR IGNORE INTO issue_dependencies (issue_id, depends_on) VALUES (?, ?);") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  try stmt.bind(index=2, depends_on) catch { _ => return Result::Err("bind failed") }
+  
+  try stmt.step_once() catch { _ => return Result::Err("step failed") }
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(())
+}
+
+///|
+/// Remove a dependency
+pub fn remove_dependency(storage : BeadsStorage, issue : String, depends_on : String) -> Result[Unit, String] {
+  let stmt = try storage.conn.prepare("DELETE FROM issue_dependencies WHERE issue_id = ? AND depends_on = ?;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  try stmt.bind(index=2, depends_on) catch { _ => return Result::Err("bind failed") }
+  
+  try stmt.step_once() catch { _ => return Result::Err("step failed") }
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(())
+}
+
+///|
+/// Get dependencies for an issue (what this issue depends on)
+pub fn get_dependencies(storage : BeadsStorage, issue : String) -> Result[Array[String], String] {
+  let stmt = try storage.conn.prepare("SELECT depends_on FROM issue_dependencies WHERE issue_id = ? ORDER BY depends_on;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  
+  let deps : Array[String] = []
+  while (try stmt.step() catch { _ => return Result::Err("step failed") }) {
+    let dep : String = stmt.column(index=0)
+    Array::push(deps, dep)
+  }
+  
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(deps)
+}
+
+///|
+/// Get blocked issues (issues that depend on this issue)
+pub fn get_blocked_by(storage : BeadsStorage, issue : String) -> Result[Array[String], String] {
+  let stmt = try storage.conn.prepare("SELECT issue_id FROM issue_dependencies WHERE depends_on = ? ORDER BY issue_id;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  
+  let blocked : Array[String] = []
+  while (try stmt.step() catch { _ => return Result::Err("step failed") }) {
+    let id : String = stmt.column(index=0)
+    Array::push(blocked, id)
+  }
+  
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(blocked)
+}
+
+///|
+/// Check if an issue is blocked by open issues
+pub fn is_blocked(storage : BeadsStorage, issue : String) -> Result[Bool, String] {
+  let deps = match get_dependencies(storage, issue) {
+    Result::Ok(d) => d
+    Result::Err(e) => return Result::Err(e)
+  }
+  
+  for dep in deps {
+    let dep_issue = match get_issue_by_id(storage, dep) {
+      Result::Ok(Option::Some(i)) => i
+      Result::Ok(Option::None) => { continue }
+      Result::Err(e) => return Result::Err(e)
+    }
+    if status_to_string(dep_issue.status) == "open" {
+      return Result::Ok(true)
+    }
+  }
+  
+  Result::Ok(false)
+}
+
 /// Initialize beads workspace
 pub fn init_workspace(db_path : String, prefix : Option[String]) -> Result[String, String] {
   // Create .beads directory

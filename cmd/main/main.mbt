@@ -21,6 +21,7 @@ fn main() -> Unit {
     "ready" => handle_ready_command()
     "sync" => handle_sync_command(cli_args)
     "defer" => handle_defer_command(cli_args)
+    "dep" => handle_dep_command(cli_args)
     "--help" | "-h" => {
       println(usage_text())
     }
@@ -35,7 +36,7 @@ fn main() -> Unit {
 }
 
 fn usage_text() -> String {
-  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  defer <id>              Defer an issue\n  sync                    Sync database with JSONL export\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
+  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
 }
 
 fn handle_init_command(argv : Array[String]) -> Unit {
@@ -302,6 +303,77 @@ fn handle_defer_command(argv : Array[String]) -> Unit {
       match @lib.defer_issue(storage, id) {
         Result::Ok(_) => { println("Deferred: " + id) }
         Result::Err(e) => { println("error: " + e) }
+      }
+      @lib.close(storage)
+    }
+    Result::Err(e) => { println("error: " + e) }
+  }
+}
+
+fn handle_dep_command(argv : Array[String]) -> Unit {
+  if argv.length() < 4 {
+    println("error: subcommand required")
+    println("usage: beads dep <add|remove|list> [args...]")
+    return
+  }
+
+  let subcmd = argv[2]
+  let db_path = "./.beads/beads.db"
+  
+  match @lib.open(db_path) {
+    Result::Ok(storage) => {
+      match subcmd {
+        "add" => {
+          if argv.length() < 5 {
+            println("error: two issue IDs required")
+            println("usage: beads dep add <issue> <depends_on>")
+          } else {
+            let issue = argv[3]
+            let depends_on = argv[4]
+            match @lib.add_dependency(storage, issue, depends_on) {
+              Result::Ok(_) => { println("Added dependency: " + issue + " depends on " + depends_on) }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        "remove" => {
+          if argv.length() < 5 {
+            println("error: two issue IDs required")
+            println("usage: beads dep remove <issue> <depends_on>")
+          } else {
+            let issue = argv[3]
+            let depends_on = argv[4]
+            match @lib.remove_dependency(storage, issue, depends_on) {
+              Result::Ok(_) => { println("Removed dependency") }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        "list" => {
+          if argv.length() < 4 {
+            println("error: issue ID required")
+            println("usage: beads dep list <issue>")
+          } else {
+            let issue = argv[3]
+            match @lib.get_dependencies(storage, issue) {
+              Result::Ok(deps) => {
+                if deps.length() == 0 {
+                  println("No dependencies")
+                } else {
+                  println("Dependencies for " + issue + ":")
+                  for dep in deps {
+                    println("  - " + dep)
+                  }
+                }
+              }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        _ => {
+          println("error: unknown subcommand: " + subcmd)
+          println("usage: beads dep <add|remove|list> [args...]")
+        }
       }
       @lib.close(storage)
     }
