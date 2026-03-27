@@ -284,6 +284,9 @@ pub fn defer_issue(storage : BeadsStorage, id : String) -> Result[Unit, String] 
 
 /// Initialize beads workspace
 pub fn init_workspace(db_path : String, prefix : Option[String]) -> Result[String, String] {
+  // Create .beads directory
+  try @fs.create_dir("./.beads") catch { _ => () }
+  
   let storage_result = open(db_path)
   let storage = match storage_result {
     Result::Ok(s) => s

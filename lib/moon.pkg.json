@@ -1,6 +1,7 @@
 {
   "import": [
-    "moonbit-community/sqlite3"
+    "moonbit-community/sqlite3",
+    "moonbitlang/x/fs"
   ],
   "export": [
     "open",
