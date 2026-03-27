@@ -226,3 +226,27 @@ steps:
 - Whitebox tests: `*_wbtest.mbt` files
 - Test runner: `lib/test_runner/`
 - Currently disabled in CI (needs fixing)
+
+## AI Agent Skills
+
+This project includes [moonbitlang/skills](https://github.com/moonbitlang/skills) as a git submodule in `.skills/`.
+
+### Available Skills
+
+- `moonbit-agent-guide` - Guide for writing, refactoring, and testing MoonBit projects
+- `moonbit-lang` - MoonBit language reference and coding conventions
+- `moonbit-spec-test-development` - Create formal spec-driven APIs and test suites
+- `moonbit-extract-spec-test` - Extract spec and tests from existing implementations
+- `moonbit-c-binding` - Write bindings for C libraries using native FFI
+
+### For Claude Code Users
+
+Install the skills marketplace:
+```bash
+# In Claude Code CLI
+/plugin
+# → Add Marketplace
+# → Input: moonbitlang/skills
+```
+
+Or use the local submodule directly - AI agents will discover and use these skills automatically.
