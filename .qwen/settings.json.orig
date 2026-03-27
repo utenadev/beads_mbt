@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(docs.moonbitlang.com)",
+      "WebSearch",
+      "Bash(moon *)"
+    ]
+  }
+}

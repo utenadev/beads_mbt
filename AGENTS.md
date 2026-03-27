@@ -146,3 +146,83 @@ import {
   "source": "src"
 }
 ```
+
+## Migration Notes: Rust to MoonBit
+
+### Key Differences
+
+| Aspect | Rust | MoonBit |
+|--------|------|---------|
+| **Error Handling** | `Result<T, E>`, `?` operator | `Result<T, E>`, `try/catch/noraise` |
+| **Pattern Matching** | `match` with `=>` | `match` with `=>` |
+| **Generics** | `<T>` | `[T]` |
+| **Visibility** | `pub`, `priv` | `pub`, `priv`, `pub(all)` |
+| **Memory** | Ownership, borrowing | Reference counting |
+| **Build System** | Cargo | Moon |
+
+### Common Pitfalls
+
+1. **Struct Initialization**: Use `Struct::{ field: value }` syntax
+2. **Array Operations**: `Array::push(arr, elem)` returns `Unit`, not the array
+3. **Try/Catch**: Must use parentheses in `if`/`while`: `if (try expr() catch { ... })`
+4. **Package Exports**: Must explicitly export in `moon.pkg.json`
+5. **SQLite**: No `execute()` method, use `prepare` → `step` → `finalize` pattern
+
+### SQLite Usage Pattern
+
+```moonbit
+// Correct pattern for executing SQL
+let stmt = try storage.conn.prepare("INSERT INTO ... VALUES (?);") catch { 
+  _ => return Result::Err("prepare failed") 
+}
+try stmt.bind(index=1, value) catch { 
+  _ => return Result::Err("bind failed") 
+}
+try stmt.step_once() catch { 
+  _ => return Result::Err("step failed") 
+}
+try stmt.finalize() catch { 
+  _ => return Result::Err("finalize failed") 
+}
+```
+
+### CI/CD Setup
+
+GitHub Actions workflow for MoonBit:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - name: Setup MoonBit
+    uses: hustcer/setup-moonbit@v1
+  - name: Update registry
+    run: moon update
+  - name: Build
+    run: moon build cmd/main --target native
+```
+
+## Project-Specific Knowledge
+
+### beads_mbt Architecture
+
+- **CLI Entry Point**: `cmd/main/main.mbt`
+- **Storage Layer**: `lib/storage.mbt` (SQLite via moonbit-community/sqlite3)
+- **Data Models**: `lib/model.mbt` (Issue, Status, IssueType)
+- **Utilities**: `lib/util.mbt` (ID generation)
+
+### Implemented Commands
+
+- `init` - Initialize workspace
+- `create <title>` - Create issue
+- `list` - List issues
+- `show <id>` - Show issue details
+- `update <id>` - Update issue
+- `close <id>` - Close issue
+- `ready` - Show actionable issues
+- `defer <id>` - Defer issue
+
+### Testing Strategy
+
+- Whitebox tests: `*_wbtest.mbt` files
+- Test runner: `lib/test_runner/`
+- Currently disabled in CI (needs fixing)
