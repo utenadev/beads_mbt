@@ -21,7 +21,9 @@
     "status_to_string",
     "string_to_status",
     "issue_type_to_string",
-    "string_to_issue_type",
-    "run_all_tests"
+    "string_to_issue_type"
+  ],
+  "test-import": [
+    "moonbit-community/sqlite3"
   ]
 }
