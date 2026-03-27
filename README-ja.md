@@ -22,49 +22,74 @@ moon build cmd/main --target native
 ### 初期化
 
 ```bash
-moon run cmd/main  # argv を ["beads", "init"] に設定
+moon run cmd/main -- init
 ```
 
 ### Issue 作成
 
 ```bash
-moon run cmd/main  # argv を ["beads", "create", "Issue title"] に設定
+moon run cmd/main -- create "Issue のタイトル"
 ```
 
 ### Issue 一覧表示
 
 ```bash
-moon run cmd/main  # argv を ["beads", "list"] に設定
+moon run cmd/main -- list
 ```
 
 ### Issue 詳細表示
 
 ```bash
-moon run cmd/main  # argv を ["beads", "show", "bd-xxxxxx"] に設定
+moon run cmd/main -- show "bd-xxxxxx"
 ```
 
 ### Issue 更新
 
 ```bash
-moon run cmd/main  # argv を ["beads", "update", "bd-xxxxxx", "--title", "New title"] に設定
+moon run cmd/main -- update "bd-xxxxxx" --title "新しいタイトル"
 ```
 
 ### Issue 完了
 
 ```bash
-moon run cmd/main  # argv を ["beads", "close", "bd-xxxxxx"] に設定
+moon run cmd/main -- close "bd-xxxxxx"
 ```
 
 ### 着手可能 Issue 表示
 
 ```bash
-moon run cmd/main  # argv を ["beads", "ready"] に設定
+moon run cmd/main -- ready
 ```
 
 ### Issue 延期
 
 ```bash
-moon run cmd/main  # argv を ["beads", "defer", "bd-xxxxxx"] に設定
+moon run cmd/main -- defer "bd-xxxxxx"
+```
+
+### 依存関係管理
+
+```bash
+# 依存関係追加（issueA が issueB に依存）
+moon run cmd/main -- dep add "bd-abc123" "bd-def456"
+
+# 依存関係一覧
+moon run cmd/main -- dep list "bd-abc123"
+
+# 依存関係削除
+moon run cmd/main -- dep remove "bd-abc123" "bd-def456"
+```
+
+### ヘルプ表示
+
+```bash
+moon run cmd/main -- --help
+```
+
+### バージョン表示
+
+```bash
+moon run cmd/main -- --version
 ```
 
 ## 実装済み機能
@@ -75,11 +100,45 @@ moon run cmd/main  # argv を ["beads", "defer", "bd-xxxxxx"] に設定
 | `create` | Issue 作成 | ✅ |
 | `list` | Issue 一覧表示 | ✅ |
 | `show` | Issue 詳細表示 | ✅ |
-| `update` | Issue 更新 | ✅ |
+| `update` | Issue 更新（タイトル、優先度） | ✅ |
 | `close` | Issue 完了 | ✅ |
 | `ready` | 着手可能 Issue 表示 | ✅ |
 | `defer` | Issue 延期 | ✅ |
+| `dep add` | 依存関係追加 | ✅ |
+| `dep remove` | 依存関係削除 | ✅ |
+| `dep list` | 依存関係一覧 | ✅ |
+| `--help` | ヘルプ表示 | ✅ |
+| `--version` | バージョン表示 | ✅ |
 | `sync` | JSONL sync | ❌ |
+
+## E2E テスト
+
+12 件の E2E テストを実装済み。全てのコマンドをカバレッジ：
+
+```bash
+# ローカルで実行
+bash scripts/e2e_test.sh
+
+# 結果例
+========================================
+Passed: 12
+Failed: 0
+========================================
+[INFO] All tests passed!
+```
+
+## CI/CD
+
+GitHub Actions で自動テストを実行。3 プラットフォーム対応：
+
+- ✅ Linux (ubuntu-latest)
+- ✅ macOS (macos-latest)
+- ✅ Windows (windows-latest)
+
+各プッシュ時に自動的に：
+1. 全プラットフォームでビルド
+2. E2E テスト実行（12 件）
+3. バイナリをアーティファクトとして保存
 
 ## 移植のポイント
 
@@ -279,19 +338,18 @@ let argv : Array[String] = ["beads", "list"]
 
 ## 既知の制限事項
 
-1. **コマンドライン引数**: 現在はハードコードされた値でテスト
+1. **コマンドライン引数**: `moon run` 時は `--` 以降に引数を渡す
 2. **JSONL sync**: 未実装
-3. **Dependencies**: 未実装
-4. **Labels/Comments**: 未実装
-5. **エラーメッセージ**: 英語のみ
+3. **Labels/Comments**: 未実装
+4. **エラーメッセージ**: 英語のみ
 
 ## 今後の課題
 
-1. **コマンドライン引数の実装**: `@xsys.command_line_args()` の使用
-2. **JSONL sync**: データベースと JSONL の同期
-3. **Dependencies**: ブロック関係の管理
-4. **テスト**: 包括的なテストスイートの作成
-5. **ドキュメント**: 英語版 README の作成
+1. **JSONL sync**: データベースと JSONL の同期
+2. **Labels**: ラベル管理
+3. **Comments**: コメント機能
+4. **ブロック関係の可視化**: `ready` コマンドでブロックされた Issue を除外
+5. **テストカバレッジ向上**: 単体テストの追加
 
 ## ライセンス
 
