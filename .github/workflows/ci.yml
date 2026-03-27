@@ -38,7 +38,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-linux
-        path: _build/native/release/build/cmd/main/main.exe
+        path: _build/native/debug/build/cmd/main/main.exe
         if-no-files-found: error
 
   build-macos:
@@ -62,7 +62,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-macos
-        path: _build/native/release/build/cmd/main/main.exe
+        path: _build/native/debug/build/cmd/main/main.exe
         if-no-files-found: error
 
   build-windows:
@@ -86,5 +86,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-windows
-        path: _build/native/release/build/cmd/main/main.exe
+        path: _build/native/debug/build/cmd/main/main.exe
         if-no-files-found: error
