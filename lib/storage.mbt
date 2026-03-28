@@ -372,6 +372,72 @@ pub fn is_blocked(storage : BeadsStorage, issue : String) -> Result[Bool, String
   Result::Ok(false)
 }
 
+// ============================================================================
+// Labels
+// ============================================================================
+
+///|
+/// Add a label to an issue
+pub fn add_label(storage : BeadsStorage, issue : String, label : String) -> Result[Unit, String] {
+  let stmt = try storage.conn.prepare("INSERT OR IGNORE INTO issue_labels (issue_id, label) VALUES (?, ?);") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  try stmt.bind(index=2, label) catch { _ => return Result::Err("bind failed") }
+  
+  try stmt.step_once() catch { _ => return Result::Err("step failed") }
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(())
+}
+
+///|
+/// Remove a label from an issue
+pub fn remove_label(storage : BeadsStorage, issue : String, label : String) -> Result[Unit, String] {
+  let stmt = try storage.conn.prepare("DELETE FROM issue_labels WHERE issue_id = ? AND label = ?;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  try stmt.bind(index=2, label) catch { _ => return Result::Err("bind failed") }
+  
+  try stmt.step_once() catch { _ => return Result::Err("step failed") }
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(())
+}
+
+///|
+/// Get labels for an issue
+pub fn get_labels(storage : BeadsStorage, issue : String) -> Result[Array[String], String] {
+  let stmt = try storage.conn.prepare("SELECT label FROM issue_labels WHERE issue_id = ? ORDER BY label;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  
+  let labels : Array[String] = []
+  while (try stmt.step() catch { _ => return Result::Err("step failed") }) {
+    let label : String = stmt.column(index=0)
+    Array::push(labels, label)
+  }
+  
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(labels)
+}
+
+///|
+/// Get all labels in the project
+pub fn get_all_labels(storage : BeadsStorage) -> Result[Array[String], String] {
+  let stmt = try storage.conn.prepare("SELECT DISTINCT label FROM issue_labels ORDER BY label;") catch { _ => return Result::Err("prepare failed") }
+  
+  let labels : Array[String] = []
+  while (try stmt.step() catch { _ => return Result::Err("step failed") }) {
+    let label : String = stmt.column(index=0)
+    Array::push(labels, label)
+  }
+  
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(labels)
+}
+
 /// Initialize beads workspace
 pub fn init_workspace(db_path : String, prefix : Option[String]) -> Result[String, String] {
   // Create .beads directory

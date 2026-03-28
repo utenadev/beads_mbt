@@ -22,6 +22,7 @@ fn main() -> Unit {
     "sync" => handle_sync_command(cli_args)
     "defer" => handle_defer_command(cli_args)
     "dep" => handle_dep_command(cli_args)
+    "label" => handle_label_command(cli_args)
     "--help" | "-h" => {
       println(usage_text())
     }
@@ -36,7 +37,7 @@ fn main() -> Unit {
 }
 
 fn usage_text() -> String {
-  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
+  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
 }
 
 fn handle_init_command(argv : Array[String]) -> Unit {
@@ -373,6 +374,92 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
         _ => {
           println("error: unknown subcommand: " + subcmd)
           println("usage: beads dep <add|remove|list> [args...]")
+        }
+      }
+      @lib.close(storage)
+    }
+    Result::Err(e) => { println("error: " + e) }
+  }
+}
+
+fn handle_label_command(argv : Array[String]) -> Unit {
+  if argv.length() < 3 {
+    println("error: subcommand required")
+    println("usage: beads label <add|remove|list|list-all> [args...]")
+    return
+  }
+
+  let subcmd = argv[2]
+  let db_path = "./.beads/beads.db"
+  
+  match @lib.open(db_path) {
+    Result::Ok(storage) => {
+      match subcmd {
+        "add" => {
+          if argv.length() < 5 {
+            println("error: issue ID and label required")
+            println("usage: beads label add <issue> <label>")
+          } else {
+            let issue = argv[3]
+            let label = argv[4]
+            match @lib.add_label(storage, issue, label) {
+              Result::Ok(_) => { println("Added label '" + label + "' to " + issue) }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        "remove" => {
+          if argv.length() < 5 {
+            println("error: issue ID and label required")
+            println("usage: beads label remove <issue> <label>")
+          } else {
+            let issue = argv[3]
+            let label = argv[4]
+            match @lib.remove_label(storage, issue, label) {
+              Result::Ok(_) => { println("Removed label '" + label + "' from " + issue) }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        "list" => {
+          if argv.length() < 4 {
+            println("error: issue ID required")
+            println("usage: beads label list <issue>")
+          } else {
+            let issue = argv[3]
+            match @lib.get_labels(storage, issue) {
+              Result::Ok(labels) => {
+                if labels.length() == 0 {
+                  println("No labels")
+                } else {
+                  println("Labels for " + issue + ":")
+                  for label in labels {
+                    println("  - " + label)
+                  }
+                }
+              }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        "list-all" => {
+          match @lib.get_all_labels(storage) {
+            Result::Ok(labels) => {
+              if labels.length() == 0 {
+                println("No labels in project")
+              } else {
+                println("All labels in project:")
+                for label in labels {
+                  println("  - " + label)
+                }
+              }
+            }
+            Result::Err(e) => { println("error: " + e) }
+          }
+        }
+        _ => {
+          println("error: unknown subcommand: " + subcmd)
+          println("usage: beads label <add|remove|list|list-all> [args...]")
         }
       }
       @lib.close(storage)
