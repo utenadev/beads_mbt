@@ -438,6 +438,54 @@ pub fn get_all_labels(storage : BeadsStorage) -> Result[Array[String], String] {
   Result::Ok(labels)
 }
 
+// ============================================================================
+// Search
+// ============================================================================
+
+///|
+/// Search issues by title
+pub fn search_issues(storage : BeadsStorage, query : String) -> Result[Array[Issue], String] {
+  let search_pattern = "%" + query + "%"
+  let stmt = try storage.conn.prepare("SELECT id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral FROM issues WHERE title LIKE ? ORDER BY created_at DESC;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, search_pattern) catch { _ => return Result::Err("bind failed") }
+  
+  let issues : Array[Issue] = []
+  while (try stmt.step() catch { _ => return Result::Err("step failed") }) {
+    let issue_id : String = stmt.column(index=0)
+    let title : String = stmt.column(index=1)
+    let type_str : String = stmt.column(index=2)
+    let priority : Int = stmt.column(index=3)
+    let status_str : String = stmt.column(index=4)
+    let description : String = stmt.column(index=5)
+    let assignee : String = stmt.column(index=6)
+    let owner : String = stmt.column(index=7)
+    let created_at : Int = stmt.column(index=8)
+    let updated_at : Int = stmt.column(index=9)
+    let is_ephemeral : Int = stmt.column(index=10)
+    
+    let issue = Issue::{
+      id: issue_id,
+      title: title,
+      type_: string_to_issue_type(type_str),
+      priority: priority,
+      status: string_to_status(status_str),
+      description: if description == "" { Option::None } else { Option::Some(description) },
+      assignee: if assignee == "" { Option::None } else { Option::Some(assignee) },
+      owner: if owner == "" { Option::None } else { Option::Some(owner) },
+      created_at: created_at,
+      updated_at: updated_at,
+      is_ephemeral: is_ephemeral == 1
+    }
+    
+    Array::push(issues, issue)
+  }
+  
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(issues)
+}
+
 /// Initialize beads workspace
 pub fn init_workspace(db_path : String, prefix : Option[String]) -> Result[String, String] {
   // Create .beads directory

@@ -25,6 +25,7 @@
     "remove_label",
     "get_labels",
     "get_all_labels",
+    "search_issues",
     "init_workspace",
     "make_issue",
     "generate_issue_id",
