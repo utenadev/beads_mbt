@@ -23,6 +23,7 @@ fn main() -> Unit {
     "defer" => handle_defer_command(cli_args)
     "dep" => handle_dep_command(cli_args)
     "label" => handle_label_command(cli_args)
+    "blocked" => handle_blocked_command(cli_args)
     "--help" | "-h" => {
       println(usage_text())
     }
@@ -37,7 +38,7 @@ fn main() -> Unit {
 }
 
 fn usage_text() -> String {
-  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
+  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
 }
 
 fn handle_init_command(argv : Array[String]) -> Unit {
@@ -461,6 +462,40 @@ fn handle_label_command(argv : Array[String]) -> Unit {
           println("error: unknown subcommand: " + subcmd)
           println("usage: beads label <add|remove|list|list-all> [args...]")
         }
+      }
+      @lib.close(storage)
+    }
+    Result::Err(e) => { println("error: " + e) }
+  }
+}
+
+fn handle_blocked_command(argv : Array[String]) -> Unit {
+  let db_path = "./.beads/beads.db"
+  
+  match @lib.open(db_path) {
+    Result::Ok(storage) => {
+      match @lib.list_issues(storage) {
+        Result::Ok(issues) => {
+          let mut blocked_count = 0
+          println("Blocked issues:")
+          println("")
+          
+          for issue in issues {
+            match @lib.is_blocked(storage, issue.id) {
+              Result::Ok(true) => {
+                let priority_str = "P" + issue.priority.to_string()
+                println("  " + issue.id + "  " + priority_str + "  " + issue.title)
+                blocked_count = blocked_count + 1
+              }
+              _ => ()
+            }
+          }
+          
+          if blocked_count == 0 {
+            println("  No blocked issues")
+          }
+        }
+        Result::Err(e) => { println("error: " + e) }
       }
       @lib.close(storage)
     }
