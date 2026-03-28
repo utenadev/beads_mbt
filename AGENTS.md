@@ -10,6 +10,7 @@ This project uses skills in `.skills/` directory:
 - **`.skills/rust-porting/`** - Rust CLI porting guide
 - **`.skills/js-backend/`** - JS backend development
 - **`.skills/wasm-cli/`** - WASM CLI development
+- **`.skills/testing-strategy/`** - Testing strategy (UT, E2E, QuickCheck)
 - **`.skills/mcp-gemini-cli/`** - Gemini MCP server usage
 
 **Language Note**: Some skill files may contain Korean (한국어). 
