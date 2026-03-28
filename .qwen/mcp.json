@@ -1,8 +1,0 @@
-{
-  "mcpServers": {
-    "mcp-gemini-cli": {
-      "command": "npx",
-      "args": ["mcp-gemini-cli", "--allow-npx"]
-    }
-  }
-}
