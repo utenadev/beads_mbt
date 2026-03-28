@@ -66,3 +66,40 @@ mcp-gemini-cli is available for:
 - File analysis
 
 See `.skills/mcp-gemini-cli/SKILL.md` for usage.
+
+## Qwen 活用アドバイス
+
+### スキルを具体的に指定
+
+```
+beads_mbt の Issue 作成機能を実装して。
+
+参照：
+- .skills/sqlite/SKILL.md（DB 操作）
+- .skills/beads_mbt/SKILL.md（プロジェクト仕様）
+
+要件：
+- beads create <title>
+- ID は "bd-xxxxxx" 形式
+- SQLite に保存
+```
+
+### ビルドコマンドを共有
+
+```bash
+moon build cmd/main --target native
+```
+
+### エラーをそのまま共有
+
+Qwen が修正提案します：
+```
+error: Failed to open database
+```
+
+### 段階的に実装
+
+機能ごとに分割して実装：
+1. まずはスキーマ作成
+2. 次に INSERT 実装
+3. 最後に SELECT 実装
