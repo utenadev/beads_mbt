@@ -7,6 +7,9 @@ This project uses skills in `.skills/` directory:
 - **`.skills/moonbit-lang/`** - MoonBit language fundamentals
 - **`.skills/sqlite/`** - SQLite integration
 - **`.skills/beads_mbt/`** - Project-specific guidelines
+- **`.skills/rust-porting/`** - Rust CLI porting guide
+- **`.skills/js-backend/`** - JS backend development
+- **`.skills/wasm-cli/`** - WASM CLI development
 - **`.skills/mcp-gemini-cli/`** - Gemini MCP server usage
 
 **Language Note**: Some skill files may contain Korean (한국어). 
