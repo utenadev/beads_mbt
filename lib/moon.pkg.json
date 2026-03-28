@@ -26,6 +26,8 @@
     "get_labels",
     "get_all_labels",
     "search_issues",
+    "add_comment",
+    "get_comments",
     "init_workspace",
     "make_issue",
     "generate_issue_id",

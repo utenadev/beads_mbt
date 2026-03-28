@@ -486,6 +486,45 @@ pub fn search_issues(storage : BeadsStorage, query : String) -> Result[Array[Iss
   Result::Ok(issues)
 }
 
+// ============================================================================
+// Comments
+// ============================================================================
+
+///|
+/// Add a comment to an issue
+pub fn add_comment(storage : BeadsStorage, issue : String, body : String) -> Result[Int, String] {
+  let created_at = 0  // TODO: Use actual timestamp
+  let stmt = try storage.conn.prepare("INSERT INTO comments (issue_id, body, created_at) VALUES (?, ?, ?);") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  try stmt.bind(index=2, body) catch { _ => return Result::Err("bind failed") }
+  try stmt.bind(index=3, created_at) catch { _ => return Result::Err("bind failed") }
+  
+  try stmt.step_once() catch { _ => return Result::Err("step failed") }
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  // Get the last inserted ID (simplified - in real impl would use last_insert_rowid)
+  Result::Ok(0)
+}
+
+///|
+/// Get comments for an issue
+pub fn get_comments(storage : BeadsStorage, issue : String) -> Result[Array[String], String] {
+  let stmt = try storage.conn.prepare("SELECT body FROM comments WHERE issue_id = ? ORDER BY created_at ASC;") catch { _ => return Result::Err("prepare failed") }
+  
+  try stmt.bind(index=1, issue) catch { _ => return Result::Err("bind failed") }
+  
+  let comments : Array[String] = []
+  while (try stmt.step() catch { _ => return Result::Err("step failed") }) {
+    let body : String = stmt.column(index=0)
+    Array::push(comments, body)
+  }
+  
+  try stmt.finalize() catch { _ => return Result::Err("finalize failed") }
+  
+  Result::Ok(comments)
+}
+
 /// Initialize beads workspace
 pub fn init_workspace(db_path : String, prefix : Option[String]) -> Result[String, String] {
   // Create .beads directory

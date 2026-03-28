@@ -25,6 +25,7 @@ fn main() -> Unit {
     "label" => handle_label_command(cli_args)
     "blocked" => handle_blocked_command(cli_args)
     "search" => handle_search_command(cli_args)
+    "comments" => handle_comments_command(cli_args)
     "--help" | "-h" => {
       println(usage_text())
     }
@@ -39,7 +40,7 @@ fn main() -> Unit {
 }
 
 fn usage_text() -> String {
-  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  search <query>          Search issues\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
+  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  search <query>          Search issues\n  comments <subcmd>       Manage comments\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nComments Subcommands:\n  comments add <issue> <body>   Add comment\n  comments list <issue>         List comments\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
 }
 
 fn handle_init_command(argv : Array[String]) -> Unit {
@@ -530,6 +531,67 @@ fn handle_search_command(argv : Array[String]) -> Unit {
           }
         }
         Result::Err(e) => { println("error: " + e) }
+      }
+      @lib.close(storage)
+    }
+    Result::Err(e) => { println("error: " + e) }
+  }
+}
+
+fn handle_comments_command(argv : Array[String]) -> Unit {
+  if argv.length() < 4 {
+    println("error: subcommand required")
+    println("usage: beads comments <add|list> [args...]")
+    return
+  }
+
+  let subcmd = argv[2]
+  let db_path = "./.beads/beads.db"
+  
+  match @lib.open(db_path) {
+    Result::Ok(storage) => {
+      match subcmd {
+        "add" => {
+          if argv.length() < 5 {
+            println("error: issue ID and comment body required")
+            println("usage: beads comments add <issue> <body>")
+          } else {
+            let issue = argv[3]
+            let body = argv[4]
+            match @lib.add_comment(storage, issue, body) {
+              Result::Ok(_) => { println("Comment added to " + issue) }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        "list" => {
+          if argv.length() < 4 {
+            println("error: issue ID required")
+            println("usage: beads comments list <issue>")
+          } else {
+            let issue = argv[3]
+            match @lib.get_comments(storage, issue) {
+              Result::Ok(comments) => {
+                if comments.length() == 0 {
+                  println("No comments")
+                } else {
+                  println("Comments for " + issue + ":")
+                  println("")
+                  let mut i = 0
+                  while i < comments.length() {
+                    println((i+1).to_string() + ". " + comments[i])
+                    i = i + 1
+                  }
+                }
+              }
+              Result::Err(e) => { println("error: " + e) }
+            }
+          }
+        }
+        _ => {
+          println("error: unknown subcommand: " + subcmd)
+          println("usage: beads comments <add|list> [args...]")
+        }
       }
       @lib.close(storage)
     }
