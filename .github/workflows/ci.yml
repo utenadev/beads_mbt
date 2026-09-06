@@ -12,8 +12,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        repository: utenadev/beads_mbt
     
     - name: Debug - List files
       run: ls -la
@@ -52,8 +50,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        repository: utenadev/beads_mbt
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -80,8 +76,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        repository: utenadev/beads_mbt
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
