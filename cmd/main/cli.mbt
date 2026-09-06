@@ -1,6 +1,7 @@
 /// Command-line interface for beads.
 /// Parses command-line arguments and dispatches to appropriate commands.
 
+///|
 /// Command types supported by beads
 enum Command {
   Init(InitArgs)
@@ -15,53 +16,60 @@ enum Command {
   Version
 }
 
+///|
 /// Arguments for 'init' command
 struct InitArgs {
-  prefix : Option[String]
+  prefix : String?
   force : Bool
 }
 
+///|
 /// Arguments for 'create' command
 struct CreateArgs {
   title : String
-  type_ : Option[String]
-  priority : Option[Int]
-  description : Option[String]
-  assignee : Option[String]
+  type_ : String?
+  priority : Int?
+  description : String?
+  assignee : String?
   labels : Array[String]
 }
 
+///|
 /// Arguments for 'list' command
 struct ListArgs {
-  status : Option[String]
-  priority : Option[String]
-  assignee : Option[String]
+  status : String?
+  priority : String?
+  assignee : String?
   labels : Array[String]
   json : Bool
 }
 
+///|
 /// Arguments for 'show' command
 struct ShowArgs {
   id : String
   json : Bool
 }
 
+///|
 /// Arguments for 'update' command
 struct UpdateArgs {
   id : String
-  title : Option[String]
-  priority : Option[Int]
-  status : Option[String]
-  assignee : Option[String]
-  description : Option[String]
+  title : String?
+  priority : Int?
+  status : String?
+  assignee : String?
+  description : String?
 }
 
+///|
 /// Arguments for 'close' command
 struct CloseArgs {
   id : String
-  reason : Option[String]
+  reason : String?
 }
 
+///|
 /// Arguments for 'sync' command
 struct SyncArgs {
   flush_only : Bool
@@ -69,6 +77,7 @@ struct SyncArgs {
   force : Bool
 }
 
+///|
 /// Parse command-line arguments into a Command
 fn parse_args(argv : Array[String]) -> Command {
   let len = argv.length()
@@ -92,37 +101,36 @@ fn parse_args(argv : Array[String]) -> Command {
   }
 }
 
+///|
 /// Parse 'init' command arguments
 fn parse_init(args : Array[String]) -> Command {
   let mut prefix = Option::None
   let mut force = false
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
     let arg = args[i]
     match arg {
-      "--prefix" => {
+      "--prefix" =>
         if i + 1 < len {
           prefix = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
       "--force" => {
         force = true
         i = i + 1
       }
-      _ => {
-        i = i + 1
-      }
+      _ => i = i + 1
     }
   }
-  
-  Command::Init(InitArgs::{ prefix: prefix, force: force })
+
+  Command::Init(InitArgs::{ prefix, force, })
 }
 
+///|
 /// Parse 'create' command arguments
 fn parse_create(args : Array[String]) -> Command {
   let mut title = ""
@@ -131,52 +139,47 @@ fn parse_create(args : Array[String]) -> Command {
   let mut description = Option::None
   let mut assignee = Option::None
   let labels : Array[String] = []
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
     let arg = args[i]
     match arg {
-      "--type" => {
+      "--type" =>
         if i + 1 < len {
           type_ = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--priority" | "-p" => {
+      "--priority" | "-p" =>
         if i + 1 < len {
           // TODO: Convert string to int
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--description" | "-d" => {
+      "--description" | "-d" =>
         if i + 1 < len {
           description = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--assignee" | "-a" => {
+      "--assignee" | "-a" =>
         if i + 1 < len {
           assignee = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--label" | "-l" => {
+      "--label" | "-l" =>
         if i + 1 < len {
           Array::push(labels, args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
       _ => {
         if title == "" {
           title = arg
@@ -185,10 +188,18 @@ fn parse_create(args : Array[String]) -> Command {
       }
     }
   }
-  
-  Command::Create(CreateArgs::{ title: title, type_: type_, priority: priority, description: description, assignee: assignee, labels: labels })
+
+  Command::Create(CreateArgs::{
+    title,
+    type_,
+    priority,
+    description,
+    assignee,
+    labels,
+  })
 }
 
+///|
 /// Parse 'list' command arguments
 fn parse_list(args : Array[String]) -> Command {
   let mut status = Option::None
@@ -196,62 +207,57 @@ fn parse_list(args : Array[String]) -> Command {
   let mut assignee = Option::None
   let labels : Array[String] = []
   let mut json = false
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
     let arg = args[i]
     match arg {
-      "--status" | "-s" => {
+      "--status" | "-s" =>
         if i + 1 < len {
           status = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--priority" | "-p" => {
+      "--priority" | "-p" =>
         if i + 1 < len {
           priority = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--assignee" | "-a" => {
+      "--assignee" | "-a" =>
         if i + 1 < len {
           assignee = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--label" | "-l" => {
+      "--label" | "-l" =>
         if i + 1 < len {
           Array::push(labels, args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
       "--json" => {
         json = true
         i = i + 1
       }
-      _ => {
-        i = i + 1
-      }
+      _ => i = i + 1
     }
   }
-  
-  Command::List(ListArgs::{ status: status, priority: priority, assignee: assignee, labels: labels, json: json })
+
+  Command::List(ListArgs::{ status, priority, assignee, labels, json, })
 }
 
+///|
 /// Parse 'show' command arguments
 fn parse_show(args : Array[String]) -> Command {
   let mut id = ""
   let mut json = false
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
@@ -269,10 +275,11 @@ fn parse_show(args : Array[String]) -> Command {
       }
     }
   }
-  
-  Command::Show(ShowArgs::{ id: id, json: json })
+
+  Command::Show(ShowArgs::{ id, json, })
 }
 
+///|
 /// Parse 'update' command arguments
 fn parse_update(args : Array[String]) -> Command {
   let mut id = ""
@@ -281,51 +288,41 @@ fn parse_update(args : Array[String]) -> Command {
   let mut status = Option::None
   let mut assignee = Option::None
   let mut description = Option::None
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
     let arg = args[i]
     match arg {
-      "--title" | "-t" => {
+      "--title" | "-t" =>
         if i + 1 < len {
           title = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--priority" | "-p" => {
-        if i + 1 < len {
-          i = i + 2
-        } else {
-          i = i + 1
-        }
-      }
-      "--status" => {
+      "--priority" | "-p" => if i + 1 < len { i = i + 2 } else { i = i + 1 }
+      "--status" =>
         if i + 1 < len {
           status = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--assignee" | "-a" => {
+      "--assignee" | "-a" =>
         if i + 1 < len {
           assignee = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
-      "--description" | "-d" => {
+      "--description" | "-d" =>
         if i + 1 < len {
           description = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
       _ => {
         if id == "" {
           id = arg
@@ -334,28 +331,35 @@ fn parse_update(args : Array[String]) -> Command {
       }
     }
   }
-  
-  Command::Update(UpdateArgs::{ id: id, title: title, priority: priority, status: status, assignee: assignee, description: description })
+
+  Command::Update(UpdateArgs::{
+    id,
+    title,
+    priority,
+    status,
+    assignee,
+    description,
+  })
 }
 
+///|
 /// Parse 'close' command arguments
 fn parse_close(args : Array[String]) -> Command {
   let mut id = ""
   let mut reason = Option::None
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
     let arg = args[i]
     match arg {
-      "--reason" | "-r" => {
+      "--reason" | "-r" =>
         if i + 1 < len {
           reason = Option::Some(args[i + 1])
           i = i + 2
         } else {
           i = i + 1
         }
-      }
       _ => {
         if id == "" {
           id = arg
@@ -364,16 +368,17 @@ fn parse_close(args : Array[String]) -> Command {
       }
     }
   }
-  
-  Command::Close(CloseArgs::{ id: id, reason: reason })
+
+  Command::Close(CloseArgs::{ id, reason, })
 }
 
+///|
 /// Parse 'sync' command arguments
 fn parse_sync(args : Array[String]) -> Command {
   let mut flush_only = false
   let mut import_only = false
   let mut force = false
-  
+
   let mut i = 1
   let len = args.length()
   while i < len {
@@ -391,15 +396,14 @@ fn parse_sync(args : Array[String]) -> Command {
         force = true
         i = i + 1
       }
-      _ => {
-        i = i + 1
-      }
+      _ => i = i + 1
     }
   }
-  
-  Command::Sync(SyncArgs::{ flush_only: flush_only, import_only: import_only, force: force })
+
+  Command::Sync(SyncArgs::{ flush_only, import_only, force, })
 }
 
+///|
 /// Print usage information
 fn print_usage() -> Unit {
   println("beads - Local-first issue tracker for git repositories")
@@ -422,6 +426,7 @@ fn print_usage() -> Unit {
   println("  -v, --version           Print version information")
 }
 
+///|
 /// Print version information
 fn print_version() -> Unit {
   println("beads 0.1.0 (moonbit)")

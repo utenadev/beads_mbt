@@ -1,9 +1,7 @@
 import {
-  "utenadev/beads_mbt/lib" @lib,
-  "moonbitlang/core/env" @env,
-  "moonbitlang/x/sys" @sys,
+  "utenadev/beads_mbt/lib",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
 }
 
-options(
-  "is-main": true,
-)
+pkgtype(kind: "executable")
