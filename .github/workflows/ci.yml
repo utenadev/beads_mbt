@@ -9,13 +9,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
     
     - name: Debug - List files
       run: ls -la
-      working-directory: .
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -24,19 +26,15 @@ jobs:
     
     - name: Update MoonBit registry
       run: moon update
-      working-directory: .
     
     - name: Verify MoonBit installation
       run: moon version --all
-      working-directory: .
     
     - name: Build native binary
       run: moon build cmd/main --target native
-      working-directory: .
     
     - name: Run E2E tests
       run: bash scripts/e2e_test.sh
-      working-directory: .
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
@@ -47,6 +45,9 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
@@ -58,11 +59,9 @@ jobs:
     
     - name: Update MoonBit registry
       run: moon update
-      working-directory: .
     
     - name: Build native binary
       run: moon build cmd/main --target native
-      working-directory: .
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
@@ -73,6 +72,9 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
@@ -84,7 +86,6 @@ jobs:
     
     - name: Update MoonBit registry
       run: moon update
-      working-directory: .
     
     - name: Build native binary
       run: moon build cmd/main --target native
