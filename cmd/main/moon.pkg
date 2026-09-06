@@ -1,5 +1,6 @@
 import {
   "utenadev/beads_mbt/lib" @lib,
+  "moonbitlang/core/env" @env,
   "moonbitlang/x/sys" @sys,
 }
 
