@@ -9,9 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
@@ -47,12 +44,11 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        path: .
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -74,12 +70,11 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
+      with:
+        path: .
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -91,7 +86,6 @@ jobs:
     
     - name: Build native binary
       run: moon build cmd/main --target native
-      working-directory: .
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
