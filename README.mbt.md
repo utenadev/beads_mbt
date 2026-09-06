@@ -142,4 +142,4 @@ MIT
 - [actrun (MoonBit CLI Example)](https://github.com/mizchi/actrun)
 
 ## Migration Notes
-For detailed migration notes from beads_rust to beads_mbt, see [TECH.md](TECH.md).
+For detailed migration notes from beads_rust to beads_mbt, see [TECH.md](TECH.md).# CI trigger
