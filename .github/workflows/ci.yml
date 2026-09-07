@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: /home/runner/work/beads_mbt
+        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
       with:
-        path: ''
+        path: '.'
     
     - name: Debug - List files
-      run: ls -la
+      run: pwd && ls -la
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -54,7 +54,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        path: ''
+        path: '.'
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -83,7 +83,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
-        path: ''
+        path: '.'
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
