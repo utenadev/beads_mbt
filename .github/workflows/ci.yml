@@ -9,14 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: '.'
     
     - name: Debug - List files
       run: pwd && ls -la
@@ -47,14 +42,9 @@ jobs:
 
   build-macos:
     runs-on: macos-latest
-    defaults:
-      run:
-        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: '.'
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -76,14 +66,9 @@ jobs:
 
   build-windows:
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: .
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: '.'
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
