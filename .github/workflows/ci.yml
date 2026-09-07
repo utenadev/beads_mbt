@@ -15,8 +15,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: ''
     
     - name: Debug - List files
       run: pwd && ls -la
@@ -53,8 +51,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: ''
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
@@ -82,8 +78,6 @@ jobs:
     
     steps:
     - uses: actions/checkout@v4
-      with:
-        path: ''
     
     - name: Setup MoonBit
       uses: hustcer/setup-moonbit@v1
