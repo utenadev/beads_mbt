@@ -51,7 +51,7 @@ setup() {
 
 # Run a command and capture output
 run_cmd() {
-    moon run cmd/main -- "$@" 2>&1
+    moon run cmd/bm -- "$@" 2>&1
 }
 
 # ============================================================================
@@ -209,7 +209,7 @@ test_version() {
     
     output=$(run_cmd --version)
     
-    if echo "$output" | grep -q "beads"; then
+    if echo "$output" | grep -q "bm"; then
         test_pass "version shows version"
     else
         test_fail "version should show version"

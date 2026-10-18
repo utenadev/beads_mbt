@@ -1,7 +1,7 @@
 ///|
 /// Entry point for the beads CLI tool.
-/// Run with `moon run cmd/main -- <args>` from the project root.
-/// Build with `moon build cmd/main --target native` for native binary.
+/// Run with `moon run cmd/bm -- <args>` from the project root.
+/// Build with `moon build cmd/bm --target native` for native binary.
 fn main {
   let cli_args = @env.args()
 
@@ -27,7 +27,7 @@ fn main {
     "search" => handle_search_command(cli_args)
     "comments" => handle_comments_command(cli_args)
     "--help" | "-h" => println(usage_text())
-    "--version" | "-v" => println("beads 0.1.0 (moonbit)")
+    "--version" | "-v" => println("bm 0.1.0 (moonbit)")
     _ => {
       println("unknown command: " + command)
       println(usage_text())
@@ -37,7 +37,7 @@ fn main {
 
 ///|
 fn usage_text() -> String {
-  "beads - Local-first issue tracker for git repositories\n\nUsage:\n  beads [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  search <query>          Search issues\n  comments <subcmd>       Manage comments\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nComments Subcommands:\n  comments add <issue> <body>   Add comment\n  comments list <issue>         List comments\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
+  "bm - Local-first issue tracker for git repositories\n\nUsage:\n  bm [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  search <query>          Search issues\n  comments <subcmd>       Manage comments\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nComments Subcommands:\n  comments add <issue> <body>   Add comment\n  comments list <issue>         List comments\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
 }
 
 ///|
@@ -85,7 +85,7 @@ fn handle_init_command(argv : Array[String]) -> Unit {
 fn handle_create_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: title is required")
-    println("usage: beads create <title> [--priority N] [--type TYPE]")
+    println("usage: bm create <title> [--priority N] [--type TYPE]")
     return
   }
 
@@ -146,7 +146,7 @@ fn handle_list_command(_argv : Array[String]) -> Unit {
 fn handle_show_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: issue ID is required")
-    println("usage: beads show <id>")
+    println("usage: bm show <id>")
     return
   }
 
@@ -176,7 +176,7 @@ fn handle_show_command(argv : Array[String]) -> Unit {
 fn handle_update_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: issue ID is required")
-    println("usage: beads update <id> [--title TITLE] [--priority N]")
+    println("usage: bm update <id> [--title TITLE] [--priority N]")
     return
   }
 
@@ -243,7 +243,7 @@ fn handle_update_command(argv : Array[String]) -> Unit {
 fn handle_close_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: issue ID is required")
-    println("usage: beads close <id>")
+    println("usage: bm close <id>")
     return
   }
 
@@ -299,7 +299,7 @@ fn handle_sync_command(_argv : Array[String]) -> Unit {
 fn handle_defer_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: issue ID is required")
-    println("usage: beads defer <id>")
+    println("usage: bm defer <id>")
     return
   }
 
@@ -322,7 +322,7 @@ fn handle_defer_command(argv : Array[String]) -> Unit {
 fn handle_dep_command(argv : Array[String]) -> Unit {
   if argv.length() < 4 {
     println("error: subcommand required")
-    println("usage: beads dep <add|remove|list> [args...]")
+    println("usage: bm dep <add|remove|list> [args...]")
     return
   }
 
@@ -335,7 +335,7 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
         "add" =>
           if argv.length() < 5 {
             println("error: two issue IDs required")
-            println("usage: beads dep add <issue> <depends_on>")
+            println("usage: bm dep add <issue> <depends_on>")
           } else {
             let issue = argv[3]
             let depends_on = argv[4]
@@ -350,7 +350,7 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
         "remove" =>
           if argv.length() < 5 {
             println("error: two issue IDs required")
-            println("usage: beads dep remove <issue> <depends_on>")
+            println("usage: bm dep remove <issue> <depends_on>")
           } else {
             let issue = argv[3]
             let depends_on = argv[4]
@@ -362,7 +362,7 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
         "list" =>
           if argv.length() < 4 {
             println("error: issue ID required")
-            println("usage: beads dep list <issue>")
+            println("usage: bm dep list <issue>")
           } else {
             let issue = argv[3]
             match @lib.get_dependencies(storage, issue) {
@@ -380,7 +380,7 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
           }
         _ => {
           println("error: unknown subcommand: " + subcmd)
-          println("usage: beads dep <add|remove|list> [args...]")
+          println("usage: bm dep <add|remove|list> [args...]")
         }
       }
       @lib.close(storage)
@@ -393,7 +393,7 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
 fn handle_label_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: subcommand required")
-    println("usage: beads label <add|remove|list|list-all> [args...]")
+    println("usage: bm label <add|remove|list|list-all> [args...]")
     return
   }
 
@@ -406,7 +406,7 @@ fn handle_label_command(argv : Array[String]) -> Unit {
         "add" =>
           if argv.length() < 5 {
             println("error: issue ID and label required")
-            println("usage: beads label add <issue> <label>")
+            println("usage: bm label add <issue> <label>")
           } else {
             let issue = argv[3]
             let label = argv[4]
@@ -419,7 +419,7 @@ fn handle_label_command(argv : Array[String]) -> Unit {
         "remove" =>
           if argv.length() < 5 {
             println("error: issue ID and label required")
-            println("usage: beads label remove <issue> <label>")
+            println("usage: bm label remove <issue> <label>")
           } else {
             let issue = argv[3]
             let label = argv[4]
@@ -432,7 +432,7 @@ fn handle_label_command(argv : Array[String]) -> Unit {
         "list" =>
           if argv.length() < 4 {
             println("error: issue ID required")
-            println("usage: beads label list <issue>")
+            println("usage: bm label list <issue>")
           } else {
             let issue = argv[3]
             match @lib.get_labels(storage, issue) {
@@ -463,7 +463,7 @@ fn handle_label_command(argv : Array[String]) -> Unit {
           }
         _ => {
           println("error: unknown subcommand: " + subcmd)
-          println("usage: beads label <add|remove|list|list-all> [args...]")
+          println("usage: bm label <add|remove|list|list-all> [args...]")
         }
       }
       @lib.close(storage)
@@ -513,7 +513,7 @@ fn handle_blocked_command(_argv : Array[String]) -> Unit {
 fn handle_search_command(argv : Array[String]) -> Unit {
   if argv.length() < 3 {
     println("error: search query required")
-    println("usage: beads search <query>")
+    println("usage: bm search <query>")
     return
   }
 
@@ -548,7 +548,7 @@ fn handle_search_command(argv : Array[String]) -> Unit {
 fn handle_comments_command(argv : Array[String]) -> Unit {
   if argv.length() < 4 {
     println("error: subcommand required")
-    println("usage: beads comments <add|list> [args...]")
+    println("usage: bm comments <add|list> [args...]")
     return
   }
 
@@ -561,7 +561,7 @@ fn handle_comments_command(argv : Array[String]) -> Unit {
         "add" =>
           if argv.length() < 5 {
             println("error: issue ID and comment body required")
-            println("usage: beads comments add <issue> <body>")
+            println("usage: bm comments add <issue> <body>")
           } else {
             let issue = argv[3]
             let body = argv[4]
@@ -573,7 +573,7 @@ fn handle_comments_command(argv : Array[String]) -> Unit {
         "list" =>
           if argv.length() < 4 {
             println("error: issue ID required")
-            println("usage: beads comments list <issue>")
+            println("usage: bm comments list <issue>")
           } else {
             let issue = argv[3]
             match @lib.get_comments(storage, issue) {
@@ -594,7 +594,7 @@ fn handle_comments_command(argv : Array[String]) -> Unit {
           }
         _ => {
           println("error: unknown subcommand: " + subcmd)
-          println("usage: beads comments <add|list> [args...]")
+          println("usage: bm comments <add|list> [args...]")
         }
       }
       @lib.close(storage)

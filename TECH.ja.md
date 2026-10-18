@@ -132,7 +132,7 @@ fn main() -> Unit {
 ```moonbit
 // 複数行文字列
 fn usage_text() -> String {
-  "beads - Local-first issue tracker\n\nUsage:\n  beads <command>\n"
+  "bm - Local-first issue tracker\n\nUsage:\n  bm <command>\n"
 }
 
 // 数値変換
@@ -163,7 +163,7 @@ fn main() -> Unit {
 
 ## 7. パッケージ設定
 
-### メインパッケージ (`cmd/main/moon.pkg`)
+### メインパッケージ (`cmd/bm/moon.pkg`)
 ```
 import {
   "utenadev/beads_mbt/lib",
@@ -205,12 +205,12 @@ options(
 
 ```bash
 # ビルド
-moon build cmd/main --target native
+moon build cmd/bm --target native
 
 # 実行
-moon run cmd/main -- init
-moon run cmd/main -- create "Issue title"
-moon run cmd/main -- list
+moon run cmd/bm -- init
+moon run cmd/bm -- create "Issue title"
+moon run cmd/bm -- list
 
 # テスト
 moon test
