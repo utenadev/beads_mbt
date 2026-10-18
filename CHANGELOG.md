@@ -8,11 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- E2E test suite with 12 tests covering all CLI commands
-- 20 unit tests covering model, storage, and util modules
+- E2E test suite with 18 tests covering all CLI commands
+- 35 unit tests covering model, storage, and util modules
 - Japanese documentation (README.ja.md, TECH.ja.md)
 
 ### Changed
+- `bm create` applies `--priority` (`0`-`4` / `P0`-`P4`) and `--type` instead of ignoring them
+- `bm update --priority` parses its value instead of always setting priority 1
+- `bm ready` excludes blocked issues and orders by priority, then newest, then id
+- `bm search` matches id, title, and description (was title only) and orders by priority
+- `bm blocked` lists blocked non-closed issues from a single computed set
+- `dep list` prints each dependency with its type
 - Fixed CLI argument parsing by replacing broken `@sys.get_cli_args()` with `@env.args()`
 - Restored full CLI command handlers (init, create, list, show, update, close, ready, sync, defer, dep, label, blocked, search, comments)
 - Upgraded MoonBit toolchain to `moon` 0.1.20261012 (`moonc` v0.10.15)
@@ -24,6 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Help, version, and usage messages now display `bm` instead of `beads`
 
 ### Fixed
+- `is_blocked` now ignores dependency types that never block (`related`, etc.), keeps blocking when the target is unknown, treats every non-closed blocker as open, and propagates a parent's blocked state to its children
+- Added `type` to `issue_dependencies` and made it part of the primary key, with an automatic migration for existing databases
 - Fixed FFI linker error with `moonbitlang/x` v0.4.41 by switching from `@sys.get_cli_args()` to `@env.args()`
 - Resolved all `moon check --deny-warn` warnings (deprecated idioms, unused imports/values, dead code)
 - Made `just info-check` effective by detecting regenerated `.mbti` files via `git status`

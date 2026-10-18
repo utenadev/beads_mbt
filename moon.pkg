@@ -1,6 +1,7 @@
 import {
   "utenadev/beads_mbt/lib",
   "moonbitlang/x/fs",
+  "moonbit-community/sqlite3",
 } for "test"
 
 supported_targets = "native"

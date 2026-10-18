@@ -16,6 +16,7 @@ options(
     "get_issue_by_id",
     "list_issues",
     "get_ready_issues",
+    "get_blocked_issues",
     "update_issue_status",
     "update_issue_title",
     "update_issue_priority",
@@ -39,5 +40,9 @@ options(
     "string_to_status",
     "issue_type_to_string",
     "string_to_issue_type",
+    "parse_issue_type",
+    "parse_priority",
+    "default_dependency_type",
+    "is_blocking_dependency_type",
   ],
 )

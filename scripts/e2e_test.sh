@@ -204,6 +204,95 @@ test_defer() {
     fi
 }
 
+test_create_flags() {
+    test_start "Test: create with --priority and --type"
+
+    output=$(run_cmd create "Flag test" --priority P0 --type bug)
+    issue_id=$(echo "$output" | sed 's/Created: //')
+
+    if [ -n "$issue_id" ]; then
+        detail=$(run_cmd show "$issue_id")
+
+        if echo "$detail" | grep -q "Priority: P0" && echo "$detail" | grep -q "Type: bug"; then
+            test_pass "create applies --priority and --type"
+        else
+            test_fail "create should apply --priority and --type"
+            echo "Output: $detail"
+        fi
+    else
+        test_fail "create with flags should return an issue id"
+    fi
+}
+
+test_create_flags_reject_invalid() {
+    test_start "Test: create rejects invalid flag values"
+
+    output=$(run_cmd create "Bad priority" --priority 9)
+    if ! echo "$output" | grep -q "invalid priority"; then
+        test_fail "create should reject --priority 9"
+        return
+    fi
+
+    output=$(run_cmd create "Bad type" --type nonsense)
+    if ! echo "$output" | grep -q "invalid type"; then
+        test_fail "create should reject --type nonsense"
+        return
+    fi
+
+    test_pass "create rejects invalid --priority and --type"
+}
+
+test_ready_skips_blocked() {
+    test_start "Test: ready skips blocked issues"
+
+    holder=$(run_cmd create "Holder issue" | sed 's/Created: //')
+    waiting=$(run_cmd create "Waiting issue" | sed 's/Created: //')
+    run_cmd dep add "$waiting" "$holder" > /dev/null
+
+    ready_output=$(run_cmd ready)
+    blocked_output=$(run_cmd blocked)
+
+    if echo "$ready_output" | grep -q "$waiting"; then
+        test_fail "ready should not list a blocked issue"
+    elif ! echo "$ready_output" | grep -q "$holder"; then
+        test_fail "ready should still list the unblocked holder"
+    elif ! echo "$blocked_output" | grep -q "$waiting"; then
+        test_fail "blocked should list the waiting issue"
+    else
+        test_pass "ready skips blocked issues and blocked lists them"
+    fi
+
+    # Closing the blocker releases the waiting issue.
+    run_cmd close "$holder" > /dev/null
+
+    if run_cmd ready | grep -q "$waiting"; then
+        test_pass "closing the blocker makes the issue ready"
+    else
+        test_fail "closing the blocker should make the issue ready"
+    fi
+}
+
+test_search() {
+    test_start "Test: search command"
+
+    output=$(run_cmd search "DEFER")
+
+    if echo "$output" | grep -q "Defer test"; then
+        test_pass "search matches titles ignoring case"
+    else
+        test_fail "search should match titles ignoring case"
+        echo "Output: $output"
+    fi
+
+    output=$(run_cmd search "no-such-text-anywhere")
+
+    if echo "$output" | grep -q "No issues found"; then
+        test_pass "search reports when nothing matches"
+    else
+        test_fail "search should report when nothing matches"
+    fi
+}
+
 test_help() {
     test_start "Test: help command"
     
@@ -260,6 +349,10 @@ main() {
     test_close
     test_ready
     test_defer
+    test_create_flags
+    test_create_flags_reject_invalid
+    test_ready_skips_blocked
+    test_search
     test_help
     test_version
     test_unknown_command

@@ -31,7 +31,10 @@ bm init
 ### Create Issue
 ```bash
 bm create "Issue title"
+bm create "Issue title" --priority P1 --type bug
 ```
+`--priority` accepts `0`-`4` or `P0`-`P4`, `--type` accepts
+`bug`, `feature`, `task`, `documentation` (or `docs`), `question`, `other`.
 
 ### List Issues
 ```bash
@@ -46,6 +49,7 @@ bm show "bd-xxxxxx"
 ### Update Issue
 ```bash
 bm update "bd-xxxxxx" --title "New title"
+bm update "bd-xxxxxx" --priority 2
 ```
 
 ### Close Issue
@@ -79,6 +83,10 @@ bm dep add "bd-xxxxxx" "bd-yyyyyy"
 bm dep remove "bd-xxxxxx" "bd-yyyyyy"
 bm dep list "bd-xxxxxx"
 ```
+`dep add` creates a `blocks` dependency; `dep list` prints each dependency with
+its type. An issue is blocked while a `blocks` dependency points at an issue
+that is not closed, and a child inherits the blocked state of its parent
+through `parent-child` dependencies.
 
 ### Manage Labels
 ```bash
@@ -167,6 +175,7 @@ Built and tested with MoonBit toolchain `moon` 0.1.20261012 (`moonc` v0.10.15).
 ## Known Limitations
 1. **JSONL sync**: Not implemented (`sync` prints a placeholder message)
 2. **Error messages**: English only
+3. **Search case folding**: `bm search` folds ASCII case only, so accented text has to match verbatim (beads_rust folds non-ASCII case too)
 
 ## Future Work
 1. **JSONL sync**: Database to JSONL synchronization
