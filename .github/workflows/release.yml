@@ -17,13 +17,10 @@ jobs:
       matrix:
         include:
           - runs-on: ubuntu-latest
-            binary: bm
             asset: bm-linux-x86_64
           - runs-on: macos-latest
-            binary: bm
             asset: bm-macos-arm64
           - runs-on: windows-latest
-            binary: bm.exe
             asset: bm-windows-x86_64.exe
 
     steps:
@@ -37,14 +34,14 @@ jobs:
     - name: Update MoonBit registry
       run: moon update
 
-    # MoonBit always names the native artifact `bm.exe`, so the asset is
-    # staged under the platform-specific name the release publishes.
+    # MoonBit names the native artifact `bm.exe` on every platform, so the
+    # asset is staged under the platform-specific name the release publishes.
     - name: Build native binary (release)
       run: moon build cmd/bm --target native --release
 
     - name: Stage release asset
       shell: bash
-      run: cp "_build/native/release/build/cmd/bm/${{ matrix.binary }}" "${{ matrix.asset }}"
+      run: cp _build/native/release/build/cmd/bm/bm.exe "${{ matrix.asset }}"
 
     - name: Upload release asset
       uses: actions/upload-artifact@v4
