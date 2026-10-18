@@ -1,5 +1,13 @@
 # beads_mbt Agents Guide
 
+### rules
+- 私とのやりとりは基本日本語
+- ソースコードコメント、実装の出力、コミットメッセージは英語で行う
+
+### 利用コマンド
+- findコマンドの代わりに fdコマンドを使って
+- grep コマンドの代わりに rgコマンド(ripgrep)を使って
+
 ## Project Skills
 
 This project uses skills in `.skills/` directory:
@@ -107,3 +115,5 @@ error: Failed to open database
 1. まずはスキーマ作成
 2. 次に INSERT 実装
 3. 最後に SELECT 実装
+
+
