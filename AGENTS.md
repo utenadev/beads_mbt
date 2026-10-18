@@ -12,7 +12,7 @@
 
 This project uses skills in `.skills/` directory:
 
-- **`.skills/moonbit-lang/`** - MoonBit language fundamentals
+- **`.skills/moonbit-agent-guide/`** - MoonBit language and toolchain guide
 - **`.skills/sqlite/`** - SQLite integration
 - **`.skills/beads_mbt/`** - Project-specific guidelines
 - **`.skills/rust-porting/`** - Rust CLI porting guide

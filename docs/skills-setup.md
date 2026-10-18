@@ -35,6 +35,7 @@ git commit -m "Update skills submodule"
 | `wasm-cli/` | WASM CLI development |
 | `testing-strategy/` | Testing strategy (UT, E2E, QuickCheck) |
 | `mcp-gemini-cli/` | Gemini MCP integration |
+| `moonbit-agent-guide/` | MoonBit language and toolchain guide (vendored from upstream) |
 | `moonbit-c-binding/` | C binding guides |
 | `moonbit-extract-spec-test/` | Spec extraction |
 
