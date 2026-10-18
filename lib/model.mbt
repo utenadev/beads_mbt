@@ -42,6 +42,8 @@ pub(all) struct Issue {
   description : String?
   assignee : String?
   owner : String?
+  acceptance_criteria : String?
+  prerequisites : String?
   created_at : Int32
   updated_at : Int32
   is_ephemeral : Bool
@@ -66,6 +68,8 @@ pub fn make_issue(
     description: Option::None,
     assignee: Option::None,
     owner: Option::None,
+    acceptance_criteria: Option::None,
+    prerequisites: Option::None,
     created_at: 0,
     updated_at: 0,
     is_ephemeral: false,

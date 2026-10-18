@@ -61,9 +61,40 @@ setup() {
     BEADS_DIR="$WORKDIR/.beads"
 }
 
-# Run a command in the isolated workspace and capture output
+# Run a command in the isolated workspace and capture output.
+# Failures are expected in some tests, so a non-zero exit must not stop the run
 run_cmd() {
-    ( cd "$WORKDIR" && "$BM_BIN" "$@" ) 2>&1
+    ( cd "$WORKDIR" && "$BM_BIN" "$@" ) 2>&1 || true
+    return 0
+}
+
+# Run a command and capture stdout only, so the JSON stream stays parseable
+run_cmd_stdout() {
+    ( cd "$WORKDIR" && "$BM_BIN" "$@" ) 2>/dev/null || true
+    return 0
+}
+
+# Run a command and print its exit code
+run_cmd_status() {
+    local status=0
+    ( cd "$WORKDIR" && "$BM_BIN" "$@" ) >/dev/null 2>&1 || status=$?
+    echo "$status"
+}
+
+# Is a helper available? Used to keep the suite usable without optional tools
+have() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Validate a JSON document when an interpreter is available
+valid_json() {
+    if have python3; then
+        echo "$1" | python3 -m json.tool >/dev/null 2>&1
+    elif have jq; then
+        echo "$1" | jq . >/dev/null 2>&1
+    else
+        true
+    fi
 }
 
 # ============================================================================
@@ -305,6 +336,245 @@ test_help() {
     fi
 }
 
+# ============================================================================
+# Step 2: machine-readable output
+# ============================================================================
+
+test_json_list() {
+    test_start "Test: list --json envelope"
+
+    run_cmd create "Json subject" >/dev/null
+
+    output=$(run_cmd_stdout list --json)
+
+    if ! echo "$output" | grep -q '"issues"'; then
+        test_fail "list --json should keep the issues key"
+        echo "Output: $output"
+        return
+    fi
+    if ! echo "$output" | grep -q '"total"' || ! echo "$output" | grep -q '"has_more"'; then
+        test_fail "list --json should keep the page keys"
+        echo "Output: $output"
+        return
+    fi
+    if ! valid_json "$output"; then
+        test_fail "list --json should be valid JSON"
+        echo "Output: $output"
+        return
+    fi
+
+    # --robot is the alias of --json, and --fields trims the projection
+    robot=$(run_cmd_stdout list --robot --fields id,title)
+    if ! echo "$robot" | grep -q '"title"'; then
+        test_fail "list --robot --fields should project the columns"
+        echo "Output: $robot"
+        return
+    fi
+    if echo "$robot" | grep -q '"description"'; then
+        test_fail "list --robot --fields should drop the unselected columns"
+        return
+    fi
+
+    test_pass "list --json writes the page envelope and honors --robot/--fields"
+}
+
+test_json_ready_and_search() {
+    test_start "Test: ready --json and search --json"
+
+    run_cmd create "Json ready subject" >/dev/null
+
+    ready_all=$(run_cmd_stdout ready --json)
+    if ! echo "$ready_all" | grep -q '"description"'; then
+        test_fail "ready --json should hydrate the full record"
+        echo "Output: $ready_all"
+        return
+    fi
+
+    ready_brief=$(run_cmd_stdout ready --brief --json)
+    if echo "$ready_brief" | grep -q '"description"'; then
+        test_fail "ready --brief should drop the long text columns"
+        return
+    fi
+    if ! echo "$ready_brief" | grep -q '"issue_type"'; then
+        test_fail "ready --brief should keep the columns needed to choose work"
+        return
+    fi
+    if ! valid_json "$ready_brief"; then
+        test_fail "ready --brief --json should be valid JSON"
+        return
+    fi
+
+    found=$(run_cmd_stdout search "Json ready" --json)
+    if ! echo "$found" | grep -q '"hidden_closed_count"'; then
+        test_fail "search --json should keep the search keys"
+        echo "Output: $found"
+        return
+    fi
+    # text mode still reports the same match
+    if ! run_cmd search "Json ready" | grep -q "Json ready subject"; then
+        test_fail "search text output should still list the match"
+        return
+    fi
+
+    test_pass "ready and search write JSON and keep text output working"
+}
+
+test_json_error_envelopes() {
+    test_start "Test: JSON errors and exit codes"
+
+    output=$(run_cmd_stdout show bd-NOTEXIST --json)
+    status=$(run_cmd_status show bd-NOTEXIST --json)
+
+    if [ "$status" != "3" ]; then
+        test_fail "show of a missing issue should exit 3, got $status"
+        return
+    fi
+    if ! echo "$output" | grep -q '"code":"ISSUE_NOT_FOUND"'; then
+        test_fail "the envelope should carry ISSUE_NOT_FOUND"
+        echo "Output: $output"
+        return
+    fi
+    if ! valid_json "$output"; then
+        test_fail "the error envelope should be valid JSON"
+        return
+    fi
+
+    # human mode keeps the diagnostic on stderr so stdout stays clean
+    human_stdout=$(run_cmd_stdout show bd-NOTEXIST)
+    if [ -n "$human_stdout" ]; then
+        test_fail "human mode should not write an error to stdout"
+        echo "Output: $human_stdout"
+        return
+    fi
+
+    if [ "$(run_cmd_status create 'Bad priority' --priority 9)" != "4" ]; then
+        test_fail "an invalid priority should exit 4"
+        return
+    fi
+    if [ "$(run_cmd_status list --sort priority)" != "4" ]; then
+        test_fail "an unknown option should exit 4"
+        return
+    fi
+    if [ "$(run_cmd_status frobnicate)" != "4" ]; then
+        test_fail "an unknown command should exit 4"
+        return
+    fi
+    if [ "$(run_cmd_status sync)" != "1" ]; then
+        test_fail "the sync stub should exit 1"
+        return
+    fi
+
+    test_pass "failures carry the documented exit codes and envelopes"
+}
+
+test_exclude_label() {
+    test_start "Test: --exclude-label"
+
+    hidden=$(run_cmd create "Hidden work" | sed 's/Created: //')
+    shown=$(run_cmd create "Visible work" | sed 's/Created: //')
+    run_cmd label add "$hidden" internal >/dev/null
+
+    listed=$(run_cmd list --exclude-label internal)
+    if echo "$listed" | grep -q "$hidden"; then
+        test_fail "list --exclude-label should hide the labeled issue"
+        return
+    fi
+    if ! echo "$listed" | grep -q "$shown"; then
+        test_fail "list --exclude-label should keep unlabeled issues"
+        return
+    fi
+
+    ready=$(run_cmd ready --exclude-label internal)
+    if echo "$ready" | grep -q "$hidden"; then
+        test_fail "ready --exclude-label should hide the labeled issue"
+        return
+    fi
+
+    searched=$(run_cmd search "work" --exclude-label internal)
+    if echo "$searched" | grep -q "$hidden"; then
+        test_fail "search --exclude-label should hide the labeled issue"
+        return
+    fi
+
+    # list and ready only: blocked has no such filter
+    if [ "$(run_cmd_status blocked --exclude-label internal)" != "4" ]; then
+        test_fail "blocked --exclude-label should be rejected"
+        return
+    fi
+
+    test_pass "--exclude-label hides any matching issue"
+}
+
+test_show_multiple_ids() {
+    test_start "Test: show with several IDs"
+
+    first=$(run_cmd create "First shown" | sed 's/Created: //')
+    second=$(run_cmd create "Second shown" | sed 's/Created: //')
+
+    output=$(run_cmd show "$first" "$second")
+    if ! echo "$output" | grep -q "First shown" || ! echo "$output" | grep -q "Second shown"; then
+        test_fail "show should print every requested issue"
+        echo "Output: $output"
+        return
+    fi
+
+    json=$(run_cmd_stdout show "$first" "$second" --json)
+    if ! valid_json "$json"; then
+        test_fail "show --json should be valid JSON"
+        return
+    fi
+    if [ "$(echo "$json" | grep -o '"id"' | wc -l)" != "2" ]; then
+        test_fail "show --json should write one object per ID"
+        echo "Output: $json"
+        return
+    fi
+
+    # one missing ID fails the whole command, like beads_rust
+    if [ "$(run_cmd_status show "$first" bd-NOTEXIST)" != "3" ]; then
+        test_fail "show should fail when any ID is missing"
+        return
+    fi
+
+    test_pass "show accepts several IDs and fails when one is missing"
+}
+
+test_show_planning_sections() {
+    test_start "Test: show renders the planning sections"
+
+    if ! have sqlite3; then
+        test_pass "skipped: sqlite3 is not available"
+        return
+    fi
+
+    issue=$(run_cmd create "Planned work" | sed 's/Created: //')
+    sqlite3 "$BEADS_DIR/beads.db" \
+        "UPDATE issues SET acceptance_criteria = '- [ ] green tests', prerequisites = 'needs a design' WHERE id = '$issue';"
+
+    output=$(run_cmd show "$issue")
+    if ! echo "$output" | grep -q "Prerequisites:"; then
+        test_fail "show should print the Prerequisites section"
+        echo "Output: $output"
+        return
+    fi
+    if ! echo "$output" | grep -q "Acceptance Criteria:"; then
+        test_fail "show should print the Acceptance Criteria section"
+        return
+    fi
+    if ! echo "$output" | grep -q "green tests"; then
+        test_fail "show should print the acceptance criteria text"
+        return
+    fi
+
+    # an issue without those columns prints neither heading
+    plain=$(run_cmd create "Unplanned work" | sed 's/Created: //')
+    if run_cmd show "$plain" | grep -q "Prerequisites:"; then
+        test_fail "show should omit an empty Prerequisites section"
+        return
+    fi
+
+    test_pass "show prints the planning sections only when they have text"
+}
+
 test_version() {
     test_start "Test: version command"
     
@@ -353,6 +623,12 @@ main() {
     test_create_flags_reject_invalid
     test_ready_skips_blocked
     test_search
+    test_json_list
+    test_json_ready_and_search
+    test_json_error_envelopes
+    test_exclude_label
+    test_show_multiple_ids
+    test_show_planning_sections
     test_help
     test_version
     test_unknown_command

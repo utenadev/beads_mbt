@@ -43,7 +43,11 @@ bm list
 ### Issue 詳細表示
 ```bash
 bm show "bd-xxxxxx"
+bm show "bd-xxxxxx" "bd-yyyyyy"    # 複数 ID をまとめて表示
 ```
+Issue が値を持っている場合のみ `Prerequisites:` と `Acceptance Criteria:` の
+セクションを表示します。存在しない ID が 1 つでもあるとコマンド全体が終了コード
+`3` で失敗するため、途中まで表示された結果を完全な結果と誤認しません。
 
 ### Issue 更新
 ```bash
@@ -59,6 +63,7 @@ bm close "bd-xxxxxx"
 ### 着手可能 Issue 表示
 ```bash
 bm ready
+bm ready --brief
 ```
 
 ### Issue 延期
@@ -75,6 +80,15 @@ bm blocked
 ```bash
 bm search "検索クエリ"
 ```
+
+### ラベルによる除外
+```bash
+bm list --exclude-label internal
+bm ready --exclude-label internal --brief
+bm search "検索クエリ" --exclude-label internal
+```
+`--exclude-label` は繰り返し指定でき、指定したラベルのいずれかを持つ Issue を
+非表示にします。`bm blocked` にはこのフィルタがありません（beads_rust と同じ）。
 
 ### 依存関係の管理
 ```bash
@@ -100,6 +114,74 @@ bm comments add "bd-xxxxxx" "コメント本文"
 bm comments list "bd-xxxxxx"
 ```
 
+## 機械可読出力
+
+すべてのコマンドは `--json`（別名 `--robot`）を受け付け、`--format json|text`
+でも名前で指定できます。
+
+```bash
+bm list --json
+bm ready --robot
+bm show "bd-xxxxxx" --format json
+```
+
+JSON モードでは stdout に機械可読なドキュメントだけを出力します（成功時は結果、
+失敗時はエラー envelope）。人間向けモードでは診断を stderr に出すため、パイプ
+ラインはフィルタなしで stdout を読めます。
+
+```json
+{"error":{"code":"ISSUE_NOT_FOUND","message":"Issue not found: bd-x","hint":"Run 'bm list' to see available issues.","retryable":false,"context":{"searched_id":"bd-x"}}}
+```
+
+### 終了コード
+
+| コード | 意味 |
+|-------|------|
+| 0 | 成功 |
+| 1 | 内部エラー |
+| 2 | DB エラー |
+| 3 | Issue が見つからない |
+| 4 | バリデーションエラー（引数不足、不正な値、未知のオプション） |
+| 5 | 依存関係エラー |
+
+beads_rust の契約のうち `6`〜`8` は、本移植で未実装の機能用に予約しています。
+
+### コマンドごとの JSON 形式
+
+| コマンド | 出力 |
+|---------|------|
+| `list` | `{"issues":[...],"total":N,"limit":0,"offset":0,"has_more":false}` |
+| `blocked` | 同じ envelope。各行に `blocked_by` と `blocked_by_count` が付きます |
+| `ready` | Issue オブジェクトの配列 |
+| `search` | `{"issues":[...],"hidden_closed_count":0,"limit":50,"offset":0,"has_more":B}` |
+| `show` | 指定した ID ごとに 1 つの Issue オブジェクトを持つ配列 |
+| `create` / `update` / `close` / `defer` | 変更後の Issue オブジェクト |
+| `dep list` / `label list` / `label list-all` / `comments list` | 保存されている値の配列 |
+| `dep add` / `dep remove` / `label add` / `label remove` / `comments add` | 適用した変更 |
+| `init` | `{"database":"./.beads/beads.db","prefix":"bd"}` |
+
+`bm list` は一致した全件を返すため `limit`/`offset`/`has_more` は常に
+`0`/`0`/`false` です。`bm search` は beads_rust と同じく 50 件で打ち切り、
+打ち切られた一致があるかを報告します。タイムスタンプは Unix 秒で出力します。
+
+### 列の選択
+
+`bm list --json` と `bm search --json` は `--fields` で必要な列だけを出力できます。
+指定順がキーの順序になり、未知の名前はエラーになります。
+
+```bash
+bm list --json --fields id,title,status,priority
+bm list --json --fields id,title,labels,dependency_count,dependent_count
+```
+
+指定できる名前: `id`, `title`, `description`, `status`, `priority`,
+`issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
+`created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`。
+`labels` と依存件数は追加クエリが必要なため、指定されたときだけ読み込みます。
+`bm ready --brief` は
+`id,title,status,priority,issue_type,created_at,updated_at`
+（`ready` のテキスト出力と同じ列）を選択します。
+
 ## 実装済み機能
 
 | コマンド | 機能 | 状態 |
@@ -117,7 +199,7 @@ bm comments list "bd-xxxxxx"
 | `dep` | 依存関係の管理（add/remove/list） | ✅ |
 | `label` | ラベルの管理（add/remove/list/list-all） | ✅ |
 | `comments` | コメントの管理（add/list） | ✅ |
-| `sync` | JSONL sync | ❌ |
+| `sync` | JSONL sync | ❌（終了コード `1`） |
 
 ## 開発者向け
 
@@ -171,9 +253,11 @@ import {
 MoonBit ツールチェーン `moon` 0.1.20261012（`moonc` v0.10.15）でビルド・テストしています。
 
 ## 既知の問題
-1. **JSONL sync**: 未実装（`sync` はプレースホルダーメッセージを表示）
-2. **エラーメッセージ**: 英語のみ
-3. **検索の大文字小文字**: `bm search` が畳み込むのは ASCII のみで、アクセント付き文字はそのまま一致させる必要があります（beads_rust は非 ASCII も畳み込みます）
+1. **JSONL sync**: 未実装（`bm sync` は成功を報告せず終了コード `1` で失敗します）
+2. **タイムスタンプ**: `current_timestamp()` が未実装のため `created_at` / `updated_at` は常に `0` です。JSON 出力でも全 Issue が `0` となり、「新しい順」は id 順にフォールバックします
+3. **エラーメッセージ**: 英語のみ
+4. **検索の大文字小文字**: `bm search` が畳み込むのは ASCII のみで、アクセント付き文字はそのまま一致させる必要があります（beads_rust は非 ASCII も畳み込みます）
+5. **TOON 出力**: `--format` は `text` と `json` のみ受け付けます
 
 ## 今後の作業
 1. **JSONL sync**: データベースから JSONL への同期

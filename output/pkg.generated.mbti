@@ -1,0 +1,60 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "utenadev/beads_mbt/output"
+
+import {
+  "utenadev/beads_mbt/lib",
+}
+
+// Values
+pub fn blocked_issue_json(@lib.Issue, Array[String], @lib.IssueFacts?, Array[String]) -> Json
+
+pub fn brief_fields() -> Array[String]
+
+pub fn cli_error(ErrorKind, String, String, hint? : String, context? : Json) -> CliError
+
+pub fn default_fields() -> Array[String]
+
+pub fn error_envelope(CliError) -> Json
+
+pub fn exit_code(ErrorKind) -> Int
+
+pub fn issue_json(@lib.Issue, Array[String], @lib.IssueFacts?) -> Json
+
+pub fn needs_issue_facts(Array[String]) -> Bool
+
+pub fn page_json(String, Array[Json], Int, Int, Int, Bool) -> Json
+
+pub fn parse_fields(String) -> Result[Array[String], CliError]
+
+pub fn search_json(Array[Json], Int, Int, Int, Bool) -> Json
+
+pub fn storage_error(String) -> CliError
+
+pub fn supported_fields_text() -> String
+
+// Errors
+
+// Types and methods
+pub(all) struct CliError {
+  kind : ErrorKind
+  code : String
+  message : String
+  hint : String?
+  retryable : Bool
+  context : Json
+}
+
+pub(all) enum ErrorKind {
+  Internal
+  Database
+  Issue
+  Validation
+  Dependency
+  Sync
+  Config
+  Io
+}
+
+// Type aliases
+
+// Traits
