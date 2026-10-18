@@ -3,4 +3,10 @@ _build/
 .mooncakes/
 .moonagent/.qwen/
 
+# Local state (not tracked)
+.beads/
+.qwen/
+.qwen-dialogue/
+
+# Repomix dumps
 repomix-beads_rust_*.md
