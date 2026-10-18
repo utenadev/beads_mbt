@@ -1,41 +1,25 @@
-# MoonBit Skills Setup Instructions
+# MoonBit Skills Setup
 
 ## Overview
 
-This project uses shared MoonBit development skills from a centralized repository.
+This project uses shared MoonBit development skills from a centralized
+repository, checked out as the `.skills` git submodule (see `.gitmodules`).
 
 ## Setup
 
-### 1. Add Skills Submodule
+### Initialize the submodule
+
+The submodule is already registered in `.gitmodules`. After cloning this
+repository, fetch the skill files with:
 
 ```bash
-cd /path/to/task_mbt
-git submodule add https://github.com/utenadev/moonbit-skills.git .skills
-git commit -m "Add skills as submodule"
+git submodule update --init --recursive
 ```
 
-### 2. Verify Setup
+### Update the submodule
 
 ```bash
-ls -la .skills/
-# Should show:
-# - beads_mbt/
-# - sqlite/
-# - rust-porting/
-# - js-backend/
-# - wasm-cli/
-# - testing-strategy/
-# - mcp-gemini-cli/
-# - moonbit-c-binding/
-# - moonbit-extract-spec-test/
-```
-
-### 3. Update Submodule (when skills are updated)
-
-```bash
-cd .skills
-git pull origin main
-cd ..
+git submodule update --remote .skills
 git add .skills
 git commit -m "Update skills submodule"
 ```
@@ -56,23 +40,27 @@ git commit -m "Update skills submodule"
 
 ## Usage in Development
 
-When developing MoonBit code, refer to the relevant skill documentation:
+Refer to the relevant skill documentation while developing:
 
 ```bash
-# Example: Check SQLite integration guide
+# SQLite integration guide
 cat .skills/sqlite/SKILL.md
 
-# Example: Check testing strategy
+# Testing strategy
 cat .skills/testing-strategy/SKILL.md
 ```
+
+**Language note**: some skill files may contain Korean. Prefer the
+English or Japanese files where available.
 
 ## For AI Agents
 
 When assisting with MoonBit development in this project:
 
-1. **Check skills first**: Look in `.skills/` for relevant guides
-2. **Follow skill guidelines**: Each skill has `SKILL.md` with best practices
-3. **Update skills if needed**: If new patterns are discovered, consider adding to skills repo
+1. **Check skills first**: look in `.skills/` for relevant guides
+2. **Follow skill guidelines**: each skill has a `SKILL.md` with best practices
+3. **Update skills if needed**: if new patterns are discovered, consider
+   adding them to the skills repository
 
 ## Repository Links
 
@@ -81,4 +69,4 @@ When assisting with MoonBit development in this project:
 
 ## License
 
-MIT License - See `.skills/LICENSE` for details.
+MIT License - see `.skills/LICENSE` for details.
