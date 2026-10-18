@@ -37,7 +37,7 @@ info:
 # Verify generated type definition files are up to date
 info-check:
     moon info
-    git diff --exit-code -- ':(glob)**/*.generated.mbti'
+    test -z "`git status --porcelain -- ':(glob)**/*.generated.mbti'`"
 
 # Clean build artifacts
 clean:
