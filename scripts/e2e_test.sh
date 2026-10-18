@@ -209,7 +209,7 @@ test_version() {
     
     output=$(run_cmd --version)
     
-    if echo "$output" | grep -q "beads"; then
+    if echo "$output" | grep -q "bm"; then
         test_pass "version shows version"
     else
         test_fail "version should show version"

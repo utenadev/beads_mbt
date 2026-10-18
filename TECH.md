@@ -132,7 +132,7 @@ fn main() -> Unit {
 ```moonbit
 // Multi-line strings
 fn usage_text() -> String {
-  "beads - Local-first issue tracker\n\nUsage:\n  beads <command>\n"
+  "bm - Local-first issue tracker\n\nUsage:\n  bm <command>\n"
 }
 
 // Number conversion

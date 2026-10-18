@@ -132,7 +132,7 @@ fn main() -> Unit {
 ```moonbit
 // 複数行文字列
 fn usage_text() -> String {
-  "beads - Local-first issue tracker\n\nUsage:\n  beads <command>\n"
+  "bm - Local-first issue tracker\n\nUsage:\n  bm <command>\n"
 }
 
 // 数値変換
