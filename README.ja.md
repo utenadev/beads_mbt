@@ -13,98 +13,83 @@ beads は、Git リポジトリ向けのローカルファーストなイシュ�
 git clone https://github.com/utenadev/beads_mbt.git
 cd beads_mbt
 
-# ビルド
+# ネイティブバイナリのビルド
 moon build cmd/bm --target native
 ```
 
-## クイックコマンド
-
-```bash
-just           # check + test
-just fmt       # フォーマット
-just fmt-check # フォーマット確認
-just check     # 型チェック
-just test      # テスト実行
-just test-update  # スナップショット更新
-just run       # メイン実行
-just info      # 型定義ファイル生成
-just e2e       # E2Eテスト実行
-just ci        # ローカルCI
-just ci-all    # 全ターゲットCI
-just release-check-all  # リリース前チェック
-```
+ビルドされた実行ファイルは `_build/native/debug/build/cmd/bm/bm.exe` に出力されます。以下の `bm` の例は、バイナリが `PATH` 上で `bm` として利用できる前提です。`PATH` の通ったディレクトリへコピーまたはシンボリックリンクするか、フルパスで実行してください。
 
 ## 使い方
 
 ### 初期化
 ```bash
-moon run cmd/bm -- init
+bm init
 ```
 
 ### Issue 作成
 ```bash
-moon run cmd/bm -- create "Issue のタイトル"
+bm create "Issue のタイトル"
 ```
 
 ### Issue 一覧表示
 ```bash
-moon run cmd/bm -- list
+bm list
 ```
 
 ### Issue 詳細表示
 ```bash
-moon run cmd/bm -- show "bd-xxxxxx"
+bm show "bd-xxxxxx"
 ```
 
 ### Issue 更新
 ```bash
-moon run cmd/bm -- update "bd-xxxxxx" --title "新しいタイトル"
+bm update "bd-xxxxxx" --title "新しいタイトル"
 ```
 
 ### Issue 完了
 ```bash
-moon run cmd/bm -- close "bd-xxxxxx"
+bm close "bd-xxxxxx"
 ```
 
 ### 着手可能 Issue 表示
 ```bash
-moon run cmd/bm -- ready
+bm ready
 ```
 
 ### Issue 延期
 ```bash
-moon run cmd/bm -- defer "bd-xxxxxx"
+bm defer "bd-xxxxxx"
 ```
 
 ### ブロック中 Issue 表示
 ```bash
-moon run cmd/bm -- blocked
+bm blocked
 ```
 
 ### Issue 検索
 ```bash
-moon run cmd/bm -- search "検索クエリ"
+bm search "検索クエリ"
 ```
 
 ### 依存関係の管理
 ```bash
-moon run cmd/bm -- dep add "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/bm -- dep remove "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/bm -- dep list "bd-xxxxxx"
+bm dep add "bd-xxxxxx" "bd-yyyyyy"
+bm dep remove "bd-xxxxxx" "bd-yyyyyy"
+bm dep list "bd-xxxxxx"
 ```
 
 ### ラベルの管理
 ```bash
-moon run cmd/bm -- label add "bd-xxxxxx" "bug"
-moon run cmd/bm -- label remove "bd-xxxxxx" "bug"
-moon run cmd/bm -- label list "bd-xxxxxx"
-moon run cmd/bm -- label list-all
+bm label add "bd-xxxxxx" "bug"
+bm label remove "bd-xxxxxx" "bug"
+bm label list "bd-xxxxxx"
+bm label list-all
 ```
 
 ### コメントの管理
 ```bash
-moon run cmd/bm -- comments add "bd-xxxxxx" "コメント本文"
-moon run cmd/bm -- comments list "bd-xxxxxx"
+bm comments add "bd-xxxxxx" "コメント本文"
+bm comments list "bd-xxxxxx"
 ```
 
 ## 実装済み機能
@@ -127,6 +112,26 @@ moon run cmd/bm -- comments list "bd-xxxxxx"
 | `sync` | JSONL sync | ❌ |
 
 ## 開発者向け
+
+### クイックコマンド（just）
+
+ローカル開発向けのタスクは [just](https://github.com/casey/just) レシピにまとめています。
+
+```bash
+just                # check + test
+just fmt            # フォーマット
+just fmt-check      # フォーマット確認
+just check          # 型チェック（警告をエラー扱い）
+just test           # テスト実行
+just test-update    # スナップショット更新
+just run            # moon 経由で CLI を実行
+just info           # 型定義ファイル生成
+just info-check     # 型定義ファイルが最新か確認
+just e2e            # E2E テスト実行（隔離ワークスペース）
+just ci             # ローカル CI 相当（fmt-check + info-check + check + test）
+just clean          # ビルド成果物の削除
+just release-check  # リリース前チェック
+```
 
 ### ビルドコマンド
 ```bash

@@ -13,98 +13,85 @@ beads is a local-first issue tracker designed for git repositories. This project
 git clone https://github.com/utenadev/beads_mbt.git
 cd beads_mbt
 
-# Build
+# Build the native binary
 moon build cmd/bm --target native
 ```
 
-## Quick Commands
-
-```bash
-just           # check + test
-just fmt       # format code
-just fmt-check # verify formatting
-just check     # type check
-just test      # run tests
-just test-update  # update snapshot tests
-just run       # run main
-just info      # generate type definition files
-just e2e       # run E2E tests
-just ci        # local CI equivalent
-just ci-all    # lint + js/native test matrix
-just release-check-all  # release check on js + native
-```
+The build writes the executable to `_build/native/debug/build/cmd/bm/bm.exe`.
+The `bm` examples below assume the binary is available as `bm` on your `PATH`;
+copy or symlink it there, or invoke it by its full path.
 
 ## Usage
 
 ### Initialize
 ```bash
-moon run cmd/bm -- init
+bm init
 ```
 
 ### Create Issue
 ```bash
-moon run cmd/bm -- create "Issue title"
+bm create "Issue title"
 ```
 
 ### List Issues
 ```bash
-moon run cmd/bm -- list
+bm list
 ```
 
 ### Show Issue Details
 ```bash
-moon run cmd/bm -- show "bd-xxxxxx"
+bm show "bd-xxxxxx"
 ```
 
 ### Update Issue
 ```bash
-moon run cmd/bm -- update "bd-xxxxxx" --title "New title"
+bm update "bd-xxxxxx" --title "New title"
 ```
 
 ### Close Issue
 ```bash
-moon run cmd/bm -- close "bd-xxxxxx"
+bm close "bd-xxxxxx"
 ```
 
 ### Show Ready Issues
 ```bash
-moon run cmd/bm -- ready
+bm ready
 ```
 
 ### Defer Issue
 ```bash
-moon run cmd/bm -- defer "bd-xxxxxx"
+bm defer "bd-xxxxxx"
 ```
 
 ### Show Blocked Issues
 ```bash
-moon run cmd/bm -- blocked
+bm blocked
 ```
 
 ### Search Issues
 ```bash
-moon run cmd/bm -- search "query"
+bm search "query"
 ```
 
 ### Manage Dependencies
 ```bash
-moon run cmd/bm -- dep add "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/bm -- dep remove "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/bm -- dep list "bd-xxxxxx"
+bm dep add "bd-xxxxxx" "bd-yyyyyy"
+bm dep remove "bd-xxxxxx" "bd-yyyyyy"
+bm dep list "bd-xxxxxx"
 ```
 
 ### Manage Labels
 ```bash
-moon run cmd/bm -- label add "bd-xxxxxx" "bug"
-moon run cmd/bm -- label remove "bd-xxxxxx" "bug"
-moon run cmd/bm -- label list "bd-xxxxxx"
-moon run cmd/bm -- label list-all
+bm label add "bd-xxxxxx" "bug"
+bm label remove "bd-xxxxxx" "bug"
+bm label list "bd-xxxxxx"
+bm label list-all
 ```
 
 ### Manage Comments
 ```bash
-moon run cmd/bm -- comments add "bd-xxxxxx" "Comment body"
-moon run cmd/bm -- comments list "bd-xxxxxx"
+bm comments add "bd-xxxxxx" "Comment body"
+bm comments list "bd-xxxxxx"
 ```
 
 ## Implemented Features
@@ -127,6 +114,26 @@ moon run cmd/bm -- comments list "bd-xxxxxx"
 | `sync` | JSONL sync | ❌ |
 
 ## For Developers
+
+### Quick Commands (just)
+
+Local development tasks are wrapped in [just](https://github.com/casey/just) recipes:
+
+```bash
+just                # check + test
+just fmt            # format code
+just fmt-check      # verify formatting
+just check          # type check (deny warnings)
+just test           # run tests
+just test-update    # update snapshot tests
+just run            # run the CLI via moon
+just info           # regenerate interface files
+just info-check     # verify interface files are up to date
+just e2e            # run the E2E suite (isolated workspace)
+just ci             # local CI equivalent (fmt-check + info-check + check + test)
+just clean          # clean build artifacts
+just release-check  # pre-release check
+```
 
 ### Build Commands
 ```bash
