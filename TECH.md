@@ -1,5 +1,7 @@
 # Migration Notes: beads_rust → beads_mbt
 
+[English](TECH.md) | [日本語](TECH.ja.md)
+
 This document records the technical challenges and solutions encountered during the MoonBit port of [beads_rust](https://github.com/Dicklesworthstone/beads_rust).
 
 ## 1. MoonBit Syntax and Type System
