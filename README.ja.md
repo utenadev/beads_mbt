@@ -1,5 +1,7 @@
 # beads_mbt - MoonBit 版 Beads
 
+[English](README.md) | [日本語](README.ja.md)
+
 Rust で実装された [beads_rust](https://github.com/Dicklesworthstone/beads_rust) を MoonBit に移植したプロジェクトです。
 
 ## 概要
