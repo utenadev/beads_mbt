@@ -1,5 +1,6 @@
 import {
   "moonbit-community/sqlite3",
+  "moonbitlang/core/random",
   "moonbitlang/x/fs",
 }
 

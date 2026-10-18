@@ -7,6 +7,32 @@ on:
     branches: [ main ]
 
 jobs:
+  check:
+    name: check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: '.'
+
+    - name: Setup MoonBit
+      uses: hustcer/setup-moonbit@v1
+      with:
+        version: latest
+
+    - name: Setup just
+      uses: extractions/setup-just@v2
+
+    - name: Update MoonBit registry
+      run: moon update
+
+    - name: Run local CI checks (fmt, info, check, test)
+      run: just ci
+
   build:
     runs-on: ubuntu-latest
     defaults:

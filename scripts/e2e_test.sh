@@ -1,12 +1,16 @@
 #!/bin/bash
 # E2E Test Script for beads_mbt
 # Run with: bash scripts/e2e_test.sh
-# Note: Must be run from project root directory
+#
+# The tests run in an isolated temporary workspace, so they never touch the
+# developer's ./.beads directory and can safely run in parallel. The CLI
+# resolves its database relative to the current directory, so the binary is
+# built once and then executed from the temporary workspace.
 
 set -e
 
-PROJECT_DIR="$(pwd)"
-BEADS_DIR="$PROJECT_DIR/.beads"
+PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+BM_BIN="$PROJECT_DIR/_build/native/debug/build/cmd/bm/bm.exe"
 
 # Colors for output
 RED='\033[0;31m'
@@ -37,21 +41,29 @@ test_fail() {
     ((FAILED++)) || true
 }
 
+# Isolated workspace created in setup()
+WORKDIR=""
+BEADS_DIR=""
+
 # Cleanup function
 cleanup() {
-    log_info "Cleaning up test database..."
-    rm -rf "$BEADS_DIR"
+    log_info "Cleaning up test workspace..."
+    if [ -n "$WORKDIR" ] && [ -d "$WORKDIR" ]; then
+        rm -rf "$WORKDIR"
+    fi
 }
 
 # Setup test environment
 setup() {
-    log_info "Setting up test environment..."
-    rm -rf "$BEADS_DIR"
+    log_info "Building binary and setting up test workspace..."
+    ( cd "$PROJECT_DIR" && moon build cmd/bm --target native )
+    WORKDIR="$(mktemp -d)"
+    BEADS_DIR="$WORKDIR/.beads"
 }
 
-# Run a command and capture output
+# Run a command in the isolated workspace and capture output
 run_cmd() {
-    moon run cmd/bm -- "$@" 2>&1
+    ( cd "$WORKDIR" && "$BM_BIN" "$@" ) 2>&1
 }
 
 # ============================================================================
