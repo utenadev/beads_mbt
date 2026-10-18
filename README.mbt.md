@@ -76,6 +76,37 @@ moon run cmd/main -- ready
 moon run cmd/main -- defer "bd-xxxxxx"
 ```
 
+### Show Blocked Issues
+```bash
+moon run cmd/main -- blocked
+```
+
+### Search Issues
+```bash
+moon run cmd/main -- search "query"
+```
+
+### Manage Dependencies
+```bash
+moon run cmd/main -- dep add "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/main -- dep remove "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/main -- dep list "bd-xxxxxx"
+```
+
+### Manage Labels
+```bash
+moon run cmd/main -- label add "bd-xxxxxx" "bug"
+moon run cmd/main -- label remove "bd-xxxxxx" "bug"
+moon run cmd/main -- label list "bd-xxxxxx"
+moon run cmd/main -- label list-all
+```
+
+### Manage Comments
+```bash
+moon run cmd/main -- comments add "bd-xxxxxx" "Comment body"
+moon run cmd/main -- comments list "bd-xxxxxx"
+```
+
 ## Implemented Features
 
 | Command | Description | Status |
@@ -88,6 +119,11 @@ moon run cmd/main -- defer "bd-xxxxxx"
 | `close` | Close issue | ✅ |
 | `ready` | Show actionable issues | ✅ |
 | `defer` | Defer issue | ✅ |
+| `blocked` | Show blocked issues | ✅ |
+| `search` | Search issues | ✅ |
+| `dep` | Manage dependencies (add/remove/list) | ✅ |
+| `label` | Manage labels (add/remove/list/list-all) | ✅ |
+| `comments` | Manage comments (add/list) | ✅ |
 | `sync` | JSONL sync | ❌ |
 
 ## For Developers
@@ -121,20 +157,16 @@ moon info
 ```
 
 ## Known Limitations
-1. **JSONL sync**: Not implemented
-2. **Dependencies**: Not implemented
-3. **Labels/Comments**: Not implemented
-4. **Error messages**: English only
+1. **JSONL sync**: Not implemented (`sync` prints a placeholder message)
+2. **Error messages**: English only
 
 ## Future Work
 1. **JSONL sync**: Database to JSONL synchronization
-2. **Dependencies**: Block relationship management
-3. **Labels/Comments**: Not implemented
-4. **Tests**: Comprehensive test suite
-5. **Documentation**: Enhance existing docs
+2. **Tests**: Comprehensive test suite
+3. **Documentation**: Enhance existing docs
 
 ## License
-MIT
+MIT (see [LICENSE](LICENSE))
 
 ## References
 - [beads_rust](https://github.com/Dicklesworthstone/beads_rust) - Original Rust implementation
@@ -142,60 +174,4 @@ MIT
 - [actrun (MoonBit CLI Example)](https://github.com/mizchi/actrun)
 
 ## Migration Notes
-For detailed migration notes from beads_rust to beads_mbt, see [TECH.md](TECH.md).# CI trigger
-# CI fix
-# CI fix
-# CI trigger
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
-# CI fix
+For detailed migration notes from beads_rust to beads_mbt, see [TECH.md](TECH.md).

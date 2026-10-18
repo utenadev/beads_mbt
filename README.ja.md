@@ -76,6 +76,37 @@ moon run cmd/main -- ready
 moon run cmd/main -- defer "bd-xxxxxx"
 ```
 
+### ブロック中 Issue 表示
+```bash
+moon run cmd/main -- blocked
+```
+
+### Issue 検索
+```bash
+moon run cmd/main -- search "検索クエリ"
+```
+
+### 依存関係の管理
+```bash
+moon run cmd/main -- dep add "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/main -- dep remove "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/main -- dep list "bd-xxxxxx"
+```
+
+### ラベルの管理
+```bash
+moon run cmd/main -- label add "bd-xxxxxx" "bug"
+moon run cmd/main -- label remove "bd-xxxxxx" "bug"
+moon run cmd/main -- label list "bd-xxxxxx"
+moon run cmd/main -- label list-all
+```
+
+### コメントの管理
+```bash
+moon run cmd/main -- comments add "bd-xxxxxx" "コメント本文"
+moon run cmd/main -- comments list "bd-xxxxxx"
+```
+
 ## 実装済み機能
 
 | コマンド | 機能 | 状態 |
@@ -88,6 +119,11 @@ moon run cmd/main -- defer "bd-xxxxxx"
 | `close` | Issue 完了 | ✅ |
 | `ready` | 着手可能 Issue 表示 | ✅ |
 | `defer` | Issue 延期 | ✅ |
+| `blocked` | ブロック中 Issue 表示 | ✅ |
+| `search` | Issue 検索 | ✅ |
+| `dep` | 依存関係の管理（add/remove/list） | ✅ |
+| `label` | ラベルの管理（add/remove/list/list-all） | ✅ |
+| `comments` | コメントの管理（add/list） | ✅ |
 | `sync` | JSONL sync | ❌ |
 
 ## 開発者向け
@@ -121,20 +157,16 @@ moon info
 ```
 
 ## 既知の問題
-1. **JSONL sync**: 未実装
-2. **依存関係**: 未実装
-3. **ラベル/コメント**: 未実装
-4. **エラーメッセージ**: 英語のみ
+1. **JSONL sync**: 未実装（`sync` はプレースホルダーメッセージを表示）
+2. **エラーメッセージ**: 英語のみ
 
 ## 今後の作業
 1. **JSONL sync**: データベースから JSONL への同期
-2. **依存関係**: ブロック関係管理
-3. **ラベル/コメント**: 未実装
-3. **テスト**: 包括的なテストスイート
-4. **ドキュメント**: 既存ドキュメントの拡充
+2. **テスト**: 包括的なテストスイート
+3. **ドキュメント**: 既存ドキュメントの拡充
 
 ## ライセンス
-MIT
+MIT（[LICENSE](LICENSE) を参照）
 
 ## 参考資料
 - [beads_rust](https://github.com/Dicklesworthstone/beads_rust) - 元となった Rust 実装
