@@ -8,6 +8,21 @@ pub struct BeadsStorage {
 }
 
 ///|
+/// Read a TEXT column as String, falling back to "" on error.
+fn col_string(stmt : @sqlite3.Statement, index : Int32) -> String {
+  stmt.column(index~) catch {
+    _ => ""
+  }
+}
+
+///|
+/// Read an INTEGER column as Int, falling back to 0 on error.
+fn col_int(stmt : @sqlite3.Statement, index : Int32) -> Int32 {
+  let value : Int64 = stmt.column(index~) catch { _ => 0L }
+  value.to_int()
+}
+
+///|
 /// Open or create beads database
 pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   let conn = @sqlite3.Connection::open(db_path) catch {
@@ -20,9 +35,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt1.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt1.step() catch { _ => false })
   stmt1.finalize() catch {
     _ => ()
   }
@@ -32,9 +45,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt2.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt2.step() catch { _ => false })
   stmt2.finalize() catch {
     _ => ()
   }
@@ -44,9 +55,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt3.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt3.step() catch { _ => false })
   stmt3.finalize() catch {
     _ => ()
   }
@@ -56,9 +65,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt4.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt4.step() catch { _ => false })
   stmt4.finalize() catch {
     _ => ()
   }
@@ -68,9 +75,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt5.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt5.step() catch { _ => false })
   stmt5.finalize() catch {
     _ => ()
   }
@@ -80,9 +85,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt6.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt6.step() catch { _ => false })
   stmt6.finalize() catch {
     _ => ()
   }
@@ -92,9 +95,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt7.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt7.step() catch { _ => false })
   stmt7.finalize() catch {
     _ => ()
   }
@@ -104,9 +105,7 @@ pub fn open(db_path : String) -> Result[BeadsStorage, String] {
   ) catch {
     _ => return Result::Err("prepare failed")
   }
-  stmt8.step_once() catch {
-    _ => ()
-  }
+  ignore(stmt8.step() catch { _ => false })
   stmt8.finalize() catch {
     _ => ()
   }
@@ -140,9 +139,7 @@ pub fn set_config(
   stmt.bind(index=2, value) catch {
     _ => return Result::Err("bind failed")
   }
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -165,7 +162,7 @@ pub fn get_config(
   let has_row = stmt.step() catch { _ => return Result::Err("step failed") }
 
   if has_row {
-    let value = stmt.column(index=0)
+    let value = col_string(stmt, 0)
     stmt.finalize() catch {
       _ => return Result::Err("finalize failed")
     }
@@ -277,7 +274,7 @@ pub fn insert_issue(
     },
   )
 
-  ignore(stmt.step_once() catch { _ => return Result::Err("step failed") })
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   ignore(stmt.finalize() catch { _ => return Result::Err("finalize failed") })
 
   Result::Ok(())
@@ -300,17 +297,17 @@ pub fn get_issue_by_id(
   }
 
   let result = if (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let issue_id : String = stmt.column(index=0)
-    let title : String = stmt.column(index=1)
-    let type_str : String = stmt.column(index=2)
-    let priority : Int = stmt.column(index=3)
-    let status_str : String = stmt.column(index=4)
-    let description : String = stmt.column(index=5)
-    let assignee : String = stmt.column(index=6)
-    let owner : String = stmt.column(index=7)
-    let created_at : Int = stmt.column(index=8)
-    let updated_at : Int = stmt.column(index=9)
-    let is_ephemeral : Int = stmt.column(index=10)
+    let issue_id : String = col_string(stmt, 0)
+    let title : String = col_string(stmt, 1)
+    let type_str : String = col_string(stmt, 2)
+    let priority : Int32 = col_int(stmt, 3)
+    let status_str : String = col_string(stmt, 4)
+    let description : String = col_string(stmt, 5)
+    let assignee : String = col_string(stmt, 6)
+    let owner : String = col_string(stmt, 7)
+    let created_at : Int32 = col_int(stmt, 8)
+    let updated_at : Int32 = col_int(stmt, 9)
+    let is_ephemeral : Int32 = col_int(stmt, 10)
 
     let issue = Issue::{
       id: issue_id,
@@ -362,17 +359,17 @@ pub fn list_issues(storage : BeadsStorage) -> Result[Array[Issue], String] {
   let issues : Array[Issue] = []
 
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let id : String = stmt.column(index=0)
-    let title : String = stmt.column(index=1)
-    let type_str : String = stmt.column(index=2)
-    let priority : Int = stmt.column(index=3)
-    let status_str : String = stmt.column(index=4)
-    let description : String = stmt.column(index=5)
-    let assignee : String = stmt.column(index=6)
-    let owner : String = stmt.column(index=7)
-    let created_at : Int = stmt.column(index=8)
-    let updated_at : Int = stmt.column(index=9)
-    let is_ephemeral : Int = stmt.column(index=10)
+    let id : String = col_string(stmt, 0)
+    let title : String = col_string(stmt, 1)
+    let type_str : String = col_string(stmt, 2)
+    let priority : Int32 = col_int(stmt, 3)
+    let status_str : String = col_string(stmt, 4)
+    let description : String = col_string(stmt, 5)
+    let assignee : String = col_string(stmt, 6)
+    let owner : String = col_string(stmt, 7)
+    let created_at : Int32 = col_int(stmt, 8)
+    let updated_at : Int32 = col_int(stmt, 9)
+    let is_ephemeral : Int32 = col_int(stmt, 10)
 
     let issue = Issue::{
       id,
@@ -430,9 +427,7 @@ pub fn update_issue_status(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -452,17 +447,17 @@ pub fn get_ready_issues(storage : BeadsStorage) -> Result[Array[Issue], String] 
   let issues : Array[Issue] = []
 
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let issue_id : String = stmt.column(index=0)
-    let title : String = stmt.column(index=1)
-    let type_str : String = stmt.column(index=2)
-    let priority : Int = stmt.column(index=3)
-    let status_str : String = stmt.column(index=4)
-    let description : String = stmt.column(index=5)
-    let assignee : String = stmt.column(index=6)
-    let owner : String = stmt.column(index=7)
-    let created_at : Int = stmt.column(index=8)
-    let updated_at : Int = stmt.column(index=9)
-    let is_ephemeral : Int = stmt.column(index=10)
+    let issue_id : String = col_string(stmt, 0)
+    let title : String = col_string(stmt, 1)
+    let type_str : String = col_string(stmt, 2)
+    let priority : Int32 = col_int(stmt, 3)
+    let status_str : String = col_string(stmt, 4)
+    let description : String = col_string(stmt, 5)
+    let assignee : String = col_string(stmt, 6)
+    let owner : String = col_string(stmt, 7)
+    let created_at : Int32 = col_int(stmt, 8)
+    let updated_at : Int32 = col_int(stmt, 9)
+    let is_ephemeral : Int32 = col_int(stmt, 10)
 
     let issue = Issue::{
       id: issue_id,
@@ -520,9 +515,7 @@ pub fn update_issue_title(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -535,7 +528,7 @@ pub fn update_issue_title(
 pub fn update_issue_priority(
   storage : BeadsStorage,
   id : String,
-  priority : Int,
+  priority : Int32,
 ) -> Result[Unit, String] {
   let stmt = storage.conn.prepare(
     "UPDATE issues SET priority = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
@@ -550,9 +543,7 @@ pub fn update_issue_priority(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -590,9 +581,7 @@ pub fn add_dependency(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -620,9 +609,7 @@ pub fn remove_dependency(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -648,7 +635,7 @@ pub fn get_dependencies(
 
   let deps : Array[String] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let dep : String = stmt.column(index=0)
+    let dep : String = col_string(stmt, 0)
     Array::push(deps, dep)
   }
 
@@ -677,7 +664,7 @@ pub fn get_blocked_by(
 
   let blocked : Array[String] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let id : String = stmt.column(index=0)
+    let id : String = col_string(stmt, 0)
     Array::push(blocked, id)
   }
 
@@ -737,9 +724,7 @@ pub fn add_label(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -767,9 +752,7 @@ pub fn remove_label(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -795,7 +778,7 @@ pub fn get_labels(
 
   let labels : Array[String] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let label : String = stmt.column(index=0)
+    let label : String = col_string(stmt, 0)
     Array::push(labels, label)
   }
 
@@ -817,7 +800,7 @@ pub fn get_all_labels(storage : BeadsStorage) -> Result[Array[String], String] {
 
   let labels : Array[String] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let label : String = stmt.column(index=0)
+    let label : String = col_string(stmt, 0)
     Array::push(labels, label)
   }
 
@@ -851,17 +834,17 @@ pub fn search_issues(
 
   let issues : Array[Issue] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let issue_id : String = stmt.column(index=0)
-    let title : String = stmt.column(index=1)
-    let type_str : String = stmt.column(index=2)
-    let priority : Int = stmt.column(index=3)
-    let status_str : String = stmt.column(index=4)
-    let description : String = stmt.column(index=5)
-    let assignee : String = stmt.column(index=6)
-    let owner : String = stmt.column(index=7)
-    let created_at : Int = stmt.column(index=8)
-    let updated_at : Int = stmt.column(index=9)
-    let is_ephemeral : Int = stmt.column(index=10)
+    let issue_id : String = col_string(stmt, 0)
+    let title : String = col_string(stmt, 1)
+    let type_str : String = col_string(stmt, 2)
+    let priority : Int32 = col_int(stmt, 3)
+    let status_str : String = col_string(stmt, 4)
+    let description : String = col_string(stmt, 5)
+    let assignee : String = col_string(stmt, 6)
+    let owner : String = col_string(stmt, 7)
+    let created_at : Int32 = col_int(stmt, 8)
+    let updated_at : Int32 = col_int(stmt, 9)
+    let is_ephemeral : Int32 = col_int(stmt, 10)
 
     let issue = Issue::{
       id: issue_id,
@@ -909,7 +892,7 @@ pub fn add_comment(
   storage : BeadsStorage,
   issue : String,
   body : String,
-) -> Result[Int, String] {
+) -> Result[Int32, String] {
   let created_at = 0 // TODO: Use actual timestamp
   let stmt = storage.conn.prepare(
     "INSERT INTO comments (issue_id, body, created_at) VALUES (?, ?, ?);",
@@ -927,9 +910,7 @@ pub fn add_comment(
     _ => return Result::Err("bind failed")
   }
 
-  stmt.step_once() catch {
-    _ => return Result::Err("step failed")
-  }
+  ignore(stmt.step() catch { _ => return Result::Err("step failed") })
   stmt.finalize() catch {
     _ => return Result::Err("finalize failed")
   }
@@ -956,7 +937,7 @@ pub fn get_comments(
 
   let comments : Array[String] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
-    let body : String = stmt.column(index=0)
+    let body : String = col_string(stmt, 0)
     Array::push(comments, body)
   }
 

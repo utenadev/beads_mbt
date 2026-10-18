@@ -3,8 +3,8 @@ name = "utenadev/beads_mbt"
 version = "0.1.0"
 
 import {
-  "moonbit-community/sqlite3@0.1.3",
-  "moonbitlang/x@0.4.41",
+  "moonbit-community/sqlite3@0.2.3",
+  "moonbitlang/x@0.5.5",
 }
 
 readme = "README.mbt.md"
