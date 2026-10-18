@@ -44,7 +44,11 @@ bm list
 ### Show Issue Details
 ```bash
 bm show "bd-xxxxxx"
+bm show "bd-xxxxxx" "bd-yyyyyy"    # several issues in one call
 ```
+The `Prerequisites:` and `Acceptance Criteria:` sections are printed when the
+issue carries them. An ID that matches nothing fails the whole command with
+exit code `3`, so a partly printed list never looks complete.
 
 ### Update Issue
 ```bash
@@ -60,6 +64,7 @@ bm close "bd-xxxxxx"
 ### Show Ready Issues
 ```bash
 bm ready
+bm ready --brief
 ```
 
 ### Defer Issue
@@ -76,6 +81,15 @@ bm blocked
 ```bash
 bm search "query"
 ```
+
+### Filter Out Labelled Issues
+```bash
+bm list --exclude-label internal
+bm ready --exclude-label internal --brief
+bm search "query" --exclude-label internal
+```
+`--exclude-label` can be repeated, and hides an issue as soon as any listed
+label is present. `bm blocked` has no such filter, matching beads_rust.
 
 ### Manage Dependencies
 ```bash
@@ -102,6 +116,77 @@ bm comments add "bd-xxxxxx" "Comment body"
 bm comments list "bd-xxxxxx"
 ```
 
+## Machine-readable output
+
+Every command accepts `--json`, or its alias `--robot`, and `--format
+json|text` selects the mode by name:
+
+```bash
+bm list --json
+bm ready --robot
+bm show "bd-xxxxxx" --format json
+```
+
+In JSON mode stdout carries only the machine-readable document: the result on
+success, and the error envelope on failure. Human mode keeps diagnostics on
+stderr, so a pipeline can read stdout without filtering.
+
+```json
+{"error":{"code":"ISSUE_NOT_FOUND","message":"Issue not found: bd-x","hint":"Run 'bm list' to see available issues.","retryable":false,"context":{"searched_id":"bd-x"}}}
+```
+
+### Exit codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | Internal error |
+| 2 | Database error |
+| 3 | Issue not found |
+| 4 | Validation error (missing argument, bad value, unknown option) |
+| 5 | Dependency error |
+
+Codes `6`-`8` of the beads_rust contract are reserved for the parts this port
+does not implement yet.
+
+### JSON shapes
+
+| Command | Output |
+|---------|--------|
+| `list` | `{"issues":[...],"total":N,"limit":0,"offset":0,"has_more":false}` |
+| `blocked` | the same envelope, with `blocked_by` and `blocked_by_count` on each row |
+| `ready` | an array of issue objects |
+| `search` | `{"issues":[...],"hidden_closed_count":0,"limit":50,"offset":0,"has_more":B}` |
+| `show` | an array holding one issue object per requested ID |
+| `create`, `update`, `close`, `defer` | the issue object as stored after the change |
+| `dep list`, `label list`, `label list-all`, `comments list` | an array of the stored values |
+| `dep add`, `dep remove`, `label add`, `label remove`, `comments add` | the change that was applied |
+| `init` | `{"database":"./.beads/beads.db","prefix":"bd"}` |
+
+`bm list` returns every match, which is why its `limit`/`offset`/`has_more` are
+always `0`/`0`/`false`; `bm search` caps results at `50` matches like
+beads_rust and reports whether more were left out. Timestamps are written as
+Unix seconds.
+
+### Selecting columns
+
+`bm list --json` and `bm search --json` accept `--fields` to write only the
+columns a caller needs. The order of the names is the order of the keys, and an
+unknown name fails the command:
+
+```bash
+bm list --json --fields id,title,status,priority
+bm list --json --fields id,title,labels,dependency_count,dependent_count
+```
+
+Supported names: `id`, `title`, `description`, `status`, `priority`,
+`issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
+`created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`.
+`labels` and the dependency counts need extra queries, so they are only loaded
+when a projection asks for them. `bm ready --brief` selects
+`id,title,status,priority,issue_type,created_at,updated_at`, which is what the
+`ready` text output already shows.
+
 ## Implemented Features
 
 | Command | Description | Status |
@@ -119,7 +204,7 @@ bm comments list "bd-xxxxxx"
 | `dep` | Manage dependencies (add/remove/list) | ✅ |
 | `label` | Manage labels (add/remove/list/list-all) | ✅ |
 | `comments` | Manage comments (add/list) | ✅ |
-| `sync` | JSONL sync | ❌ |
+| `sync` | JSONL sync | ❌ (exits `1`) |
 
 ## For Developers
 
@@ -173,9 +258,11 @@ import {
 Built and tested with MoonBit toolchain `moon` 0.1.20261012 (`moonc` v0.10.15).
 
 ## Known Limitations
-1. **JSONL sync**: Not implemented (`sync` prints a placeholder message)
-2. **Error messages**: English only
-3. **Search case folding**: `bm search` folds ASCII case only, so accented text has to match verbatim (beads_rust folds non-ASCII case too)
+1. **JSONL sync**: Not implemented; `bm sync` fails with exit code `1` instead of reporting success
+2. **Timestamps**: `created_at` and `updated_at` are always `0` because `current_timestamp()` is not implemented yet, so JSON output reports `0` for every issue and "most recently created first" falls back to the id order
+3. **Error messages**: English only
+4. **Search case folding**: `bm search` folds ASCII case only, so accented text has to match verbatim (beads_rust folds non-ASCII case too)
+5. **TOON output**: `--format` accepts `text` and `json` only
 
 ## Future Work
 1. **JSONL sync**: Database to JSONL synchronization

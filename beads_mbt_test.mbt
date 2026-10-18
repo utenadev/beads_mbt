@@ -153,19 +153,56 @@ test "storage: insert and get issue" {
 }
 
 ///|
-test "storage: list_issues returns all issues" {
+test "storage: list_issues orders by recency and breaks ties by id" {
   match open_fresh("/tmp/beads_test_list.db") {
     Ok(storage) => {
-      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-1", "Issue 1")))
-      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-2", "Issue 2")))
-      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-3", "Issue 3")))
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-1",
+            "Issue 1",
+            2,
+            100,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-2",
+            "Issue 2",
+            2,
+            200,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      // same second as bd-2, so the id decides
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-3",
+            "Issue 3",
+            2,
+            200,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
 
       match @lib.list_issues(storage) {
         Ok(issues) => {
           assert_eq(issues.length(), 3)
-          assert_eq(issues[0].title, "Issue 3")
-          assert_eq(issues[1].title, "Issue 2")
-          assert_eq(issues[2].title, "Issue 1")
+          assert_eq(issues[0].id, "bd-2")
+          assert_eq(issues[1].id, "bd-3")
+          assert_eq(issues[2].id, "bd-1")
         }
         Err(_) => assert_eq(true, false)
       }
@@ -381,6 +418,8 @@ fn build_issue(
     description,
     assignee: Option::None,
     owner: Option::None,
+    acceptance_criteria: Option::None,
+    prerequisites: Option::None,
     created_at,
     updated_at: created_at,
     is_ephemeral: false,
@@ -457,6 +496,38 @@ fn write_legacy_database(path : String) -> Unit {
       _ => abort("cannot prepare a legacy statement")
     }
     ignore(stmt.step() catch { _ => abort("cannot run a legacy statement") })
+    stmt.finalize() catch {
+      _ => ()
+    }
+  }
+  conn.close() catch {
+    _ => ()
+  }
+}
+
+///|
+/// Write a database at schema version 1: typed dependencies are already part
+/// of the key, but the planning columns are not there yet.
+fn write_version_one_database(path : String) -> Unit {
+  @fs.remove_file(path) catch {
+    _ => ()
+  }
+  let conn = @sqlite3.Connection::open(path) catch {
+    _ => abort("cannot open the version 1 database")
+  }
+  let statements = [
+    "CREATE TABLE issues (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'other', priority INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'open', description TEXT, assignee TEXT, owner TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, is_ephemeral INTEGER NOT NULL DEFAULT 0);",
+    "CREATE TABLE issue_dependencies (issue_id TEXT NOT NULL, depends_on TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'blocks', PRIMARY KEY (issue_id, depends_on, type));",
+    "CREATE TABLE issue_labels (issue_id TEXT NOT NULL, label TEXT NOT NULL, PRIMARY KEY (issue_id, label));",
+    "INSERT INTO issues (id, title, description, created_at, updated_at) VALUES ('bd-v1', 'Version one issue', 'kept text', 7, 7);",
+    "INSERT INTO issue_labels (issue_id, label) VALUES ('bd-v1', 'step1');", "INSERT INTO issue_dependencies (issue_id, depends_on, type) VALUES ('bd-v1', 'bd-missing', 'blocks');",
+    "PRAGMA user_version = 1;",
+  ]
+  for sql in statements {
+    let stmt = conn.prepare(sql) catch {
+      _ => abort("cannot prepare a version 1 statement")
+    }
+    ignore(stmt.step() catch { _ => abort("cannot run a version 1 statement") })
     stmt.finalize() catch {
       _ => ()
     }
@@ -899,5 +970,347 @@ test "storage: migrating a legacy database keeps its dependencies" {
       }
       @lib.close(storage)
     }
+  }
+}
+
+// ============================================================================
+// Step 2: machine-readable output
+// ============================================================================
+
+///|
+/// Build an issue that carries the planning sections `bm show` renders.
+fn build_planned_issue(
+  id : String,
+  acceptance_criteria : String?,
+  prerequisites : String?,
+) -> @lib.Issue {
+  @lib.Issue::{
+    id,
+    title: "Planned " + id,
+    type_: @lib.IssueType::Task,
+    priority: 2,
+    status: @lib.Status::Open,
+    description: Option::None,
+    assignee: Option::None,
+    owner: Option::None,
+    acceptance_criteria,
+    prerequisites,
+    created_at: 10,
+    updated_at: 10,
+    is_ephemeral: false,
+  }
+}
+
+///|
+/// The label list of one issue as a comma-separated string.
+fn facts_labels(storage : @lib.BeadsStorage, id : String) -> String {
+  let issues = match @lib.get_issue_by_id(storage, id) {
+    Ok(Option::Some(issue)) => [issue]
+    Ok(Option::None) => abort("issue is missing")
+    Err(_) => abort("get_issue_by_id returned an error")
+  }
+  let facts = match @lib.load_issue_facts(storage, issues) {
+    Ok(facts) => facts
+    Err(_) => abort("load_issue_facts returned an error")
+  }
+  match facts.get(id) {
+    Option::Some(entry) => entry.labels.join(",")
+    Option::None => abort("no facts for " + id)
+  }
+}
+
+///|
+/// The `dependency_count/dependent_count` of one issue.
+fn facts_counts(storage : @lib.BeadsStorage, id : String) -> String {
+  let issues = match @lib.get_issue_by_id(storage, id) {
+    Ok(Option::Some(issue)) => [issue]
+    Ok(Option::None) => abort("issue is missing")
+    Err(_) => abort("get_issue_by_id returned an error")
+  }
+  let facts = match @lib.load_issue_facts(storage, issues) {
+    Ok(facts) => facts
+    Err(_) => abort("load_issue_facts returned an error")
+  }
+  match facts.get(id) {
+    Option::Some(entry) =>
+      entry.dependency_count.to_string() +
+      "/" +
+      entry.dependent_count.to_string()
+    Option::None => abort("no facts for " + id)
+  }
+}
+
+///|
+/// The blocked issues as `id(blockers)` entries joined by commas.
+fn blocked_with_blockers(storage : @lib.BeadsStorage) -> String {
+  match @lib.get_blocked_issues_with_blockers(storage) {
+    Ok(entries) => {
+      let parts : Array[String] = []
+      for entry in entries {
+        Array::push(
+          parts,
+          entry.issue.id + "(" + entry.blockers.join(" ") + ")",
+        )
+      }
+      parts.join(",")
+    }
+    Err(_) => abort("get_blocked_issues_with_blockers returned an error")
+  }
+}
+
+///|
+test "storage: planning columns round-trip and read back as absent when empty" {
+  match open_fresh("/tmp/beads_test_planning_columns.db") {
+    Ok(storage) => {
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_planned_issue(
+            "bd-plan1",
+            Option::Some("- [ ] first"),
+            Option::Some("needs bd-plan2"),
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_planned_issue("bd-plan2", Option::None, Option::None),
+        ),
+      )
+
+      match @lib.get_issue_by_id(storage, "bd-plan1") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.acceptance_criteria, Option::Some("- [ ] first"))
+          assert_eq(issue.prerequisites, Option::Some("needs bd-plan2"))
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      // an empty column is `None` again, not an empty string
+      match @lib.get_issue_by_id(storage, "bd-plan2") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.acceptance_criteria, Option::None)
+          assert_eq(issue.prerequisites, Option::None)
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: migrating a legacy database adds the planning columns" {
+  let path = "/tmp/beads_test_legacy_planning.db"
+  write_legacy_database(path)
+
+  match @lib.open(path) {
+    Err(_) => assert_eq(true, false)
+    Ok(storage) => {
+      match @lib.get_issue_by_id(storage, "bd-legacy1") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.title, "Legacy blocker")
+          assert_eq(issue.acceptance_criteria, Option::None)
+          assert_eq(issue.prerequisites, Option::None)
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      // the added columns are writable after the migration
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_planned_issue(
+            "bd-legacy3",
+            Option::Some("done when green"),
+            Option::None,
+          ),
+        ),
+      )
+      match @lib.get_issue_by_id(storage, "bd-legacy3") {
+        Ok(Option::Some(issue)) =>
+          assert_eq(issue.acceptance_criteria, Option::Some("done when green"))
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+  }
+}
+
+///|
+test "storage: migrating a version one database keeps its rows and labels" {
+  let path = "/tmp/beads_test_v1_planning.db"
+  write_version_one_database(path)
+
+  match @lib.open(path) {
+    Err(_) => assert_eq(true, false)
+    Ok(storage) => {
+      match @lib.get_issue_by_id(storage, "bd-v1") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.title, "Version one issue")
+          assert_eq(issue.description, Option::Some("kept text"))
+          assert_eq(issue.created_at, 7)
+          assert_eq(issue.acceptance_criteria, Option::None)
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      assert_eq(facts_labels(storage, "bd-v1"), "step1")
+      // a version 1 row still blocks on an issue that no longer exists
+      assert_eq(is_blocked_or_fail(storage, "bd-v1"), true)
+      @lib.close(storage)
+    }
+  }
+
+  // reopening must not migrate twice
+  match @lib.open(path) {
+    Err(_) => assert_eq(true, false)
+    Ok(storage) => {
+      match @lib.get_issue_by_id(storage, "bd-v1") {
+        Ok(Option::Some(issue)) => assert_eq(issue.title, "Version one issue")
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+  }
+}
+
+///|
+test "storage: exclude_issues_with_labels hides any issue carrying a label" {
+  match open_fresh("/tmp/beads_test_exclude_labels.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-a", "A")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-b", "B")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-c", "C")))
+      ignore(@lib.add_label(storage, "bd-a", "internal"))
+      ignore(@lib.add_label(storage, "bd-a", "urgent"))
+      ignore(@lib.add_label(storage, "bd-b", "urgent"))
+
+      let issues = match @lib.list_issues(storage) {
+        Ok(issues) => issues
+        Err(_) => abort("list_issues returned an error")
+      }
+      let kept = match
+        @lib.exclude_issues_with_labels(storage, issues, ["urgent"]) {
+        Ok(kept) => kept
+        Err(_) => abort("exclude_issues_with_labels returned an error")
+      }
+      let ids : Array[String] = []
+      for issue in kept {
+        Array::push(ids, issue.id)
+      }
+      assert_eq(ids.join(","), "bd-c")
+
+      // an empty exclusion keeps every issue, and any match hides
+      match @lib.exclude_issues_with_labels(storage, issues, []) {
+        Ok(kept) => assert_eq(kept.length(), 3)
+        Err(_) => assert_eq(true, false)
+      }
+      match
+        @lib.exclude_issues_with_labels(storage, issues, ["internal", "urgent"]) {
+        Ok(kept) => assert_eq(kept.length(), 1)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: load_issue_facts counts labels and blocking edges" {
+  match open_fresh("/tmp/beads_test_issue_facts.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-f1", "One")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-f2", "Two")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-f3", "Three")))
+      ignore(@lib.add_label(storage, "bd-f1", "beta"))
+      ignore(@lib.add_label(storage, "bd-f1", "alpha"))
+      ignore(@lib.add_dependency(storage, "bd-f1", "bd-f2", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-f1", "bd-f3", "related"))
+
+      // labels come back sorted, and both typed edges count
+      assert_eq(facts_labels(storage, "bd-f1"), "alpha,beta")
+      assert_eq(facts_counts(storage, "bd-f1"), "2/0")
+      assert_eq(facts_counts(storage, "bd-f2"), "0/1")
+      assert_eq(facts_counts(storage, "bd-f3"), "0/1")
+      assert_eq(facts_labels(storage, "bd-f2"), "")
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: search_matching_issues returns every match before the cap" {
+  match open_fresh("/tmp/beads_test_search_matching.db") {
+    Ok(storage) => {
+      let mut index = 0
+      while index < 55 {
+        ignore(
+          @lib.insert_issue(
+            storage,
+            build_issue(
+              "bd-all" + index.to_string(),
+              "match number " + index.to_string(),
+              2,
+              index,
+              Option::None,
+              @lib.Status::Open,
+            ),
+          ),
+        )
+        index += 1
+      }
+      match @lib.search_matching_issues(storage, "match") {
+        Ok(matches) => assert_eq(matches.length(), 55)
+        Err(_) => assert_eq(true, false)
+      }
+      // the capped helper still stops at beads_rust's default
+      assert_eq(search_count(storage, "match"), 50)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: blocked issues carry their blockers, including inherited ones" {
+  match open_fresh("/tmp/beads_test_blockers.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-b1", "Blocker")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-b2", "Waiting")))
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-b3", "Other blocker")),
+      )
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-b4", "Child of waiting")),
+      )
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-b5", "Related only")),
+      )
+      ignore(@lib.add_dependency(storage, "bd-b2", "bd-b3", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-b2", "bd-b1", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-b2", "bd-b5", "related"))
+      ignore(@lib.add_dependency(storage, "bd-b4", "bd-b2", "parent-child"))
+
+      // sorted, without the `related` target
+      assert_eq(
+        blocked_with_blockers(storage),
+        "bd-b2(bd-b1 bd-b3),bd-b4(bd-b1 bd-b3)",
+      )
+
+      // a closed blocker drops off, and releases the inherited child too
+      ignore(@lib.update_issue_status(storage, "bd-b1", "closed"))
+      ignore(@lib.update_issue_status(storage, "bd-b3", "closed"))
+      assert_eq(blocked_with_blockers(storage), "")
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
   }
 }

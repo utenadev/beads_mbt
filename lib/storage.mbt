@@ -24,7 +24,7 @@ fn col_int(stmt : @sqlite3.Statement, index : Int32) -> Int32 {
 
 ///|
 /// Read one issue row from the current cursor position of `stmt`.
-/// The SELECT must list columns in the canonical issue order.
+/// The SELECT must list `issue_columns` in the canonical order.
 fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
   let id : String = col_string(stmt, 0)
   let title : String = col_string(stmt, 1)
@@ -37,6 +37,8 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
   let created_at : Int32 = col_int(stmt, 8)
   let updated_at : Int32 = col_int(stmt, 9)
   let is_ephemeral : Int32 = col_int(stmt, 10)
+  let acceptance_criteria = col_string(stmt, 11)
+  let prerequisites = col_string(stmt, 12)
 
   Issue::{
     id,
@@ -59,11 +61,27 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
     } else {
       Option::Some(owner)
     },
+    acceptance_criteria: if acceptance_criteria == "" {
+      Option::None
+    } else {
+      Option::Some(acceptance_criteria)
+    },
+    prerequisites: if prerequisites == "" {
+      Option::None
+    } else {
+      Option::Some(prerequisites)
+    },
     created_at,
     updated_at,
     is_ephemeral: is_ephemeral == 1,
   }
 }
+
+///|
+/// The columns of the canonical issue SELECT, in the order `read_issue_row`
+/// reads them. Every issue query spells these out so a new column only has to
+/// be added in one place.
+let issue_columns : String = "id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites"
 
 ///|
 /// A value that can be bound to a statement parameter.
@@ -127,6 +145,36 @@ fn query_strings(
   let rows : Array[String] = []
   while (stmt.step() catch { _ => return Result::Err("step failed") }) {
     Array::push(rows, col_string(stmt, 0))
+  }
+
+  stmt.finalize() catch {
+    _ => return Result::Err("finalize failed")
+  }
+  Result::Ok(rows)
+}
+
+///|
+/// Prepare `sql`, optionally bind one text parameter, and collect the first
+/// two columns of every row as a pair.
+fn query_pairs(
+  storage : BeadsStorage,
+  sql : String,
+  param : String?,
+) -> Result[Array[(String, String)], String] {
+  let stmt = storage.conn.prepare(sql) catch {
+    _ => return Result::Err("prepare failed")
+  }
+  match param {
+    Option::Some(value) =>
+      stmt.bind(index=1, value) catch {
+        _ => return Result::Err("bind failed")
+      }
+    Option::None => ()
+  }
+
+  let rows : Array[(String, String)] = []
+  while (stmt.step() catch { _ => return Result::Err("step failed") }) {
+    Array::push(rows, (col_string(stmt, 0), col_string(stmt, 1)))
   }
 
   stmt.finalize() catch {
@@ -269,7 +317,7 @@ fn query_one_string(
 /// Schema statements. Safe to run repeatedly (all use IF NOT EXISTS).
 let schema_statements : Array[String] = [
   "CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
-  "CREATE TABLE IF NOT EXISTS issues (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'other', priority INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'open', description TEXT, assignee TEXT, owner TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, closed_at INTEGER, closed_reason TEXT, parent TEXT, estimate INTEGER, due_date INTEGER, external_ref TEXT, is_ephemeral INTEGER NOT NULL DEFAULT 0);",
+  "CREATE TABLE IF NOT EXISTS issues (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'other', priority INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'open', description TEXT, assignee TEXT, owner TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, closed_at INTEGER, closed_reason TEXT, parent TEXT, estimate INTEGER, due_date INTEGER, external_ref TEXT, is_ephemeral INTEGER NOT NULL DEFAULT 0, acceptance_criteria TEXT, prerequisites TEXT);",
   "CREATE TABLE IF NOT EXISTS issue_labels (issue_id TEXT NOT NULL, label TEXT NOT NULL, PRIMARY KEY (issue_id, label), FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE);",
   "CREATE TABLE IF NOT EXISTS issue_dependencies (issue_id TEXT NOT NULL, depends_on TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'blocks', PRIMARY KEY (issue_id, depends_on, type), FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE, FOREIGN KEY (depends_on) REFERENCES issues(id) ON DELETE CASCADE);",
   "CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, issue_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE);",
@@ -280,7 +328,9 @@ let schema_statements : Array[String] = [
 ///|
 /// Schema version recorded in `PRAGMA user_version`.
 /// 1 - typed dependencies: `issue_dependencies.type` is part of the key.
-let schema_version : Int32 = 1
+/// 2 - planning columns: `issues.acceptance_criteria` and
+///     `issues.prerequisites` hold the plans `bm show` renders.
+let schema_version : Int32 = 2
 
 ///|
 /// Execute a statement that takes no parameters.
@@ -344,6 +394,8 @@ fn user_version(conn : @sqlite3.Connection) -> Result[Int32, String] {
 /// of the primary key, and keeps existing rows as `blocks` edges. The DDL is
 /// spelled out instead of reusing `schema_statements` so that a later change
 /// to the current schema cannot rewrite this migration.
+/// The planning columns of version 2 are plain additions, so they can be
+/// appended in place and existing rows simply read back as `NULL`.
 fn migrate_schema(conn : @sqlite3.Connection) -> Result[Unit, String] {
   let version = match user_version(conn) {
     Result::Ok(v) => v
@@ -366,6 +418,20 @@ fn migrate_schema(conn : @sqlite3.Connection) -> Result[Unit, String] {
     ]
     for sql in steps {
       match exec_sql(conn, sql) {
+        Result::Ok(_) => ()
+        Result::Err(e) => return Result::Err(e)
+      }
+    }
+  }
+
+  for column in ["acceptance_criteria", "prerequisites"] {
+    let present = match column_exists(conn, "issues", column) {
+      Result::Ok(v) => v
+      Result::Err(e) => return Result::Err(e)
+    }
+    if !present {
+      match
+        exec_sql(conn, "ALTER TABLE issues ADD COLUMN " + column + " TEXT;") {
         Result::Ok(_) => ()
         Result::Err(e) => return Result::Err(e)
       }
@@ -454,10 +520,18 @@ pub fn insert_issue(
     Option::Some(value) => value
     Option::None => ""
   }
+  let acceptance_criteria = match issue.acceptance_criteria {
+    Option::Some(value) => value
+    Option::None => ""
+  }
+  let prerequisites = match issue.prerequisites {
+    Option::Some(value) => value
+    Option::None => ""
+  }
 
   exec_write(
     storage,
-    "INSERT INTO issues (id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+    "INSERT INTO issues (id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
     [
       SqlParam::Text(issue.id),
       SqlParam::Text(issue.title),
@@ -470,6 +544,8 @@ pub fn insert_issue(
       SqlParam::Int(issue.created_at),
       SqlParam::Int(issue.updated_at),
       SqlParam::Int(if issue.is_ephemeral { 1 } else { 0 }),
+      SqlParam::Text(acceptance_criteria),
+      SqlParam::Text(prerequisites),
     ],
   )
 }
@@ -482,17 +558,19 @@ pub fn get_issue_by_id(
 ) -> Result[Issue?, String] {
   query_one_issue(
     storage,
-    "SELECT id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral FROM issues WHERE id = ?;",
+    "SELECT " + issue_columns + " FROM issues WHERE id = ?;",
     Option::Some(id),
   )
 }
 
 ///|
-/// List all issues
+/// List all issues, most recently created first.
+/// Timestamps have second resolution, so the id breaks ties and keeps the
+/// order stable between runs.
 pub fn list_issues(storage : BeadsStorage) -> Result[Array[Issue], String] {
   query_issues(
     storage,
-    "SELECT id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral FROM issues ORDER BY created_at DESC;",
+    "SELECT " + issue_columns + " FROM issues ORDER BY created_at DESC, id ASC;",
     Option::None,
   )
 }
@@ -518,7 +596,9 @@ pub fn get_ready_issues(storage : BeadsStorage) -> Result[Array[Issue], String] 
   let open_issues = match
     query_issues(
       storage,
-      "SELECT id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral FROM issues WHERE status = 'open' ORDER BY priority ASC, created_at DESC, id ASC;",
+      "SELECT " +
+      issue_columns +
+      " FROM issues WHERE status = 'open' ORDER BY priority ASC, created_at DESC, id ASC;",
       Option::None,
     ) {
     Result::Ok(issues) => issues
@@ -541,15 +621,16 @@ pub fn get_ready_issues(storage : BeadsStorage) -> Result[Array[Issue], String] 
 }
 
 ///|
-/// Ids of every currently blocked issue, as a lookup set.
+/// Every blocked issue id mapped to the blockers holding it back, sorted and
+/// free of duplicates.
 /// A blocking edge (`blocks`, `conditional-blocks`, `waits-for`) holds the
 /// source issue back while its target is not closed; an unknown target keeps
-/// blocking, like beads_rust. A child then inherits a blocked parent through
-/// `parent-child` edges, which is why the propagation below repeats until it
-/// reaches a fixed point.
-fn compute_blocked_set(
+/// blocking, like beads_rust. A child then inherits its parent's blockers
+/// through `parent-child` edges, which is why the propagation below repeats
+/// until it reaches a fixed point.
+fn compute_blockers(
   storage : BeadsStorage,
-) -> Result[Map[String, Bool], String] {
+) -> Result[Map[String, Array[String]], String] {
   let issues = match list_issues(storage) {
     Result::Ok(issues) => issues
     Result::Err(e) => return Result::Err(e)
@@ -564,7 +645,7 @@ fn compute_blocked_set(
     Result::Err(e) => return Result::Err(e)
   }
 
-  let blocked : Map[String, Bool] = Map([])
+  let blockers : Map[String, Array[String]] = Map([])
   for edge in edges {
     if is_blocking_dependency_type(edge.type_) {
       let target_open = match statuses.get(edge.depends_on) {
@@ -572,7 +653,7 @@ fn compute_blocked_set(
         None => true
       }
       if target_open {
-        blocked.set(edge.issue_id, true)
+        ignore(add_blocker(blockers, edge.issue_id, edge.depends_on))
       }
     }
   }
@@ -581,13 +662,12 @@ fn compute_blocked_set(
   while changed {
     changed = false
     for edge in edges {
-      if edge.type_ == "parent-child" {
-        match blocked.get(edge.depends_on) {
-          Some(_) =>
-            match blocked.get(edge.issue_id) {
-              Some(_) => ()
-              None => {
-                blocked.set(edge.issue_id, true)
+      // A self edge would make the propagation below walk its own result.
+      if edge.type_ == "parent-child" && edge.issue_id != edge.depends_on {
+        match blockers.get(edge.depends_on) {
+          Some(inherited) =>
+            for blocker in inherited {
+              if add_blocker(blockers, edge.issue_id, blocker) {
                 changed = true
               }
             }
@@ -597,7 +677,87 @@ fn compute_blocked_set(
     }
   }
 
+  Result::Ok(blockers)
+}
+
+///|
+/// Record `blocker` as a blocker of `issue`, keeping the list sorted and
+/// without repeats. Reports whether the list grew.
+fn add_blocker(
+  blockers : Map[String, Array[String]],
+  issue : String,
+  blocker : String,
+) -> Bool {
+  let known = match blockers.get(issue) {
+    Option::Some(known) => known
+    Option::None => {
+      let fresh : Array[String] = []
+      blockers.set(issue, fresh)
+      fresh
+    }
+  }
+
+  let mut index = 0
+  while index < known.length() && known[index] < blocker {
+    index += 1
+  }
+  if index < known.length() && known[index] == blocker {
+    return false
+  }
+  known.insert(index, blocker)
+  true
+}
+
+///|
+/// Ids of every currently blocked issue, as a lookup set.
+/// See `compute_blockers` for the exact rules.
+fn compute_blocked_set(
+  storage : BeadsStorage,
+) -> Result[Map[String, Bool], String] {
+  let blockers = match compute_blockers(storage) {
+    Result::Ok(blockers) => blockers
+    Result::Err(e) => return Result::Err(e)
+  }
+  let blocked : Map[String, Bool] = Map([])
+  for id, _ in blockers {
+    blocked.set(id, true)
+  }
   Result::Ok(blocked)
+}
+
+///|
+/// A blocked issue together with the blockers holding it back.
+pub(all) struct BlockedIssue {
+  issue : Issue
+  blockers : Array[String]
+}
+
+///|
+/// Blocked issues with their blockers, most recently created first.
+/// Closed issues are left out: they are done, not waiting.
+pub fn get_blocked_issues_with_blockers(
+  storage : BeadsStorage,
+) -> Result[Array[BlockedIssue], String] {
+  let issues = match list_issues(storage) {
+    Result::Ok(issues) => issues
+    Result::Err(e) => return Result::Err(e)
+  }
+  let blockers = match compute_blockers(storage) {
+    Result::Ok(blockers) => blockers
+    Result::Err(e) => return Result::Err(e)
+  }
+
+  let result : Array[BlockedIssue] = []
+  for issue in issues {
+    if status_to_string(issue.status) != "closed" {
+      match blockers.get(issue.id) {
+        Option::Some(ids) =>
+          Array::push(result, BlockedIssue::{ issue, blockers: ids, })
+        Option::None => ()
+      }
+    }
+  }
+  Result::Ok(result)
 }
 
 ///|
@@ -606,23 +766,14 @@ fn compute_blocked_set(
 pub fn get_blocked_issues(
   storage : BeadsStorage,
 ) -> Result[Array[Issue], String] {
-  let issues = match list_issues(storage) {
-    Result::Ok(issues) => issues
-    Result::Err(e) => return Result::Err(e)
-  }
-  let blocked = match compute_blocked_set(storage) {
-    Result::Ok(set) => set
+  let blocked = match get_blocked_issues_with_blockers(storage) {
+    Result::Ok(blocked) => blocked
     Result::Err(e) => return Result::Err(e)
   }
 
   let result : Array[Issue] = []
-  for issue in issues {
-    if status_to_string(issue.status) != "closed" {
-      match blocked.get(issue.id) {
-        Some(_) => Array::push(result, issue)
-        None => ()
-      }
-    }
+  for entry in blocked {
+    Array::push(result, entry.issue)
   }
   Result::Ok(result)
 }
@@ -809,29 +960,153 @@ pub fn get_all_labels(storage : BeadsStorage) -> Result[Array[String], String] {
   )
 }
 
+///|
+/// Labels and dependency counts of one issue, for structured output.
+/// These live outside the `issues` table, so they are loaded on demand
+/// instead of with every issue row.
+pub(all) struct IssueFacts {
+  labels : Array[String]
+  dependency_count : Int32
+  dependent_count : Int32
+}
+
+///|
+/// Load labels and dependency counts for `issues`, keyed by issue id.
+/// Two queries cover the whole set, so a page of issues never costs one query
+/// per row. Issues without labels or edges are present with empty values.
+pub fn load_issue_facts(
+  storage : BeadsStorage,
+  issues : Array[Issue],
+) -> Result[Map[String, IssueFacts], String] {
+  let labels_by_issue : Map[String, Array[String]] = Map([])
+  let label_rows = match
+    query_pairs(
+      storage,
+      "SELECT issue_id, label FROM issue_labels ORDER BY issue_id, label;",
+      Option::None,
+    ) {
+    Result::Ok(rows) => rows
+    Result::Err(e) => return Result::Err(e)
+  }
+  for row in label_rows {
+    match labels_by_issue.get(row.0) {
+      Option::Some(labels) => Array::push(labels, row.1)
+      Option::None => labels_by_issue.set(row.0, [row.1])
+    }
+  }
+
+  let dependency_counts : Map[String, Int32] = Map([])
+  let dependent_counts : Map[String, Int32] = Map([])
+  let edges = match get_all_dependencies(storage) {
+    Result::Ok(edges) => edges
+    Result::Err(e) => return Result::Err(e)
+  }
+  for edge in edges {
+    let current = match dependency_counts.get(edge.issue_id) {
+      Option::Some(count) => count
+      Option::None => 0
+    }
+    dependency_counts.set(edge.issue_id, current + 1)
+
+    let dependents = match dependent_counts.get(edge.depends_on) {
+      Option::Some(count) => count
+      Option::None => 0
+    }
+    dependent_counts.set(edge.depends_on, dependents + 1)
+  }
+
+  let facts : Map[String, IssueFacts] = Map([])
+  for issue in issues {
+    facts.set(issue.id, IssueFacts::{
+      labels: match labels_by_issue.get(issue.id) {
+        Option::Some(labels) => labels
+        Option::None => []
+      },
+      dependency_count: match dependency_counts.get(issue.id) {
+        Option::Some(count) => count
+        Option::None => 0
+      },
+      dependent_count: match dependent_counts.get(issue.id) {
+        Option::Some(count) => count
+        Option::None => 0
+      },
+    })
+  }
+  Result::Ok(facts)
+}
+
+///|
+/// Drop every issue that carries one of `excluded` labels.
+/// A repeatable `--exclude-label` hides an issue as soon as any listed label is
+/// present, so the labels are collected into a set before the scan.
+pub fn exclude_issues_with_labels(
+  storage : BeadsStorage,
+  issues : Array[Issue],
+  excluded : Array[String],
+) -> Result[Array[Issue], String] {
+  if excluded.length() == 0 {
+    return Result::Ok(issues)
+  }
+
+  let unwanted : Map[String, Bool] = Map([])
+  for label in excluded {
+    unwanted.set(label, true)
+  }
+
+  let rows = match
+    query_pairs(
+      storage,
+      "SELECT issue_id, label FROM issue_labels;",
+      Option::None,
+    ) {
+    Result::Ok(rows) => rows
+    Result::Err(e) => return Result::Err(e)
+  }
+  let hidden : Map[String, Bool] = Map([])
+  for row in rows {
+    match unwanted.get(row.1) {
+      Option::Some(_) => hidden.set(row.0, true)
+      Option::None => ()
+    }
+  }
+
+  let kept : Array[Issue] = []
+  for issue in issues {
+    match hidden.get(issue.id) {
+      Option::Some(_) => ()
+      Option::None => Array::push(kept, issue)
+    }
+  }
+  Result::Ok(kept)
+}
+
 // ============================================================================
 // Search
 // ============================================================================
 
 ///|
 /// Maximum number of search results, mirroring beads_rust's default.
-let search_limit : Int32 = 50
+pub let search_limit : Int32 = 50
 
 ///|
-/// Search issues by id, title, or description, ignoring ASCII case.
+/// Every issue matching `query`, ignoring ASCII case, ordered like beads_rust.
 /// Rows are matched in MoonBit rather than with SQL `LIKE` so the field set
 /// stays explicit, and a local tracker is small enough that scanning the
 /// ordered table is cheap. Ordering matches beads_rust: priority, then newest,
 /// then id. beads_rust also folds non-ASCII case; MoonBit's `to_lower` only
 /// folds ASCII, so accented text has to match verbatim.
-pub fn search_issues(
+/// The caller applies its own result cap, which is how `bm search` can report
+/// whether more matches were left out.
+pub fn search_matching_issues(
   storage : BeadsStorage,
   query : String,
 ) -> Result[Array[Issue], String] {
   let issues = match
     query_issues(
       storage,
-      "SELECT id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral FROM issues ORDER BY priority ASC, created_at DESC, id ASC;",
+      "SELECT " +
+      issue_columns +
+      " FROM issues ORDER BY priority ASC, created_at DESC, id ASC;",
       Option::None,
     ) {
     Result::Ok(issues) => issues
@@ -840,15 +1115,38 @@ pub fn search_issues(
 
   let needle = query.to_lower()
   let matches : Array[Issue] = []
-  let mut index = 0
-  while index < issues.length() && matches.length() < search_limit {
-    let issue = issues[index]
+  for issue in issues {
     if issue_matches(issue, needle) {
       Array::push(matches, issue)
     }
-    index += 1
   }
   Result::Ok(matches)
+}
+
+///|
+/// The first `search_limit` matches of `query`.
+pub fn search_issues(
+  storage : BeadsStorage,
+  query : String,
+) -> Result[Array[Issue], String] {
+  let matches = match search_matching_issues(storage, query) {
+    Result::Ok(matches) => matches
+    Result::Err(e) => return Result::Err(e)
+  }
+  Result::Ok(take_issues(matches, search_limit))
+}
+
+///|
+/// The first `limit` issues of `issues` (or all of them when `limit` is not
+/// positive).
+fn take_issues(issues : Array[Issue], limit : Int32) -> Array[Issue] {
+  let taken : Array[Issue] = []
+  let mut index = 0
+  while index < issues.length() && (limit <= 0 || index < limit) {
+    Array::push(taken, issues[index])
+    index += 1
+  }
+  taken
 }
 
 ///|

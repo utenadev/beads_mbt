@@ -6,6 +6,13 @@ package "utenadev/beads_mbt/cmd/bm"
 // Errors
 
 // Types and methods
+type Context
+
+type OutputMode
+
+type QueryFlags
+
+type QueryOptions
 
 // Type aliases
 
