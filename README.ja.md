@@ -147,14 +147,15 @@ moon info
 ```
 
 ### 依存関係
-```json
-{
-  "deps": {
-    "moonbit-community/sqlite3": "0.1.3",
-    "moonbitlang/x": "0.4.41"
-  }
+```
+// moon.mod
+import {
+  "moonbit-community/sqlite3@0.2.3",
+  "moonbitlang/x@0.5.5",
 }
 ```
+
+MoonBit ツールチェーン `moon` 0.1.20261012（`moonc` v0.10.15）でビルド・テストしています。
 
 ## 既知の問題
 1. **JSONL sync**: 未実装（`sync` はプレースホルダーメッセージを表示）

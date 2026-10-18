@@ -15,9 +15,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Fixed CLI argument parsing by replacing broken `@sys.get_cli_args()` with `@env.args()`
 - Restored full CLI command handlers (init, create, list, show, update, close, ready, sync, defer, dep, label, blocked, search, comments)
+- Upgraded MoonBit toolchain to `moon` 0.1.20261012 (`moonc` v0.10.15)
+- Bumped dependencies: `moonbit-community/sqlite3` 0.1.3 → 0.2.3, `moonbitlang/x` 0.4.41 → 0.5.5
+- Migrated to the sqlite3 0.2.3 API (`step_once()` → `step()`, `Int64` column reads)
+- Removed unused `cmd/main/cli.mbt` dead code
+- Declared `supported_targets = "native"` in all packages
 
 ### Fixed
 - Fixed FFI linker error with `moonbitlang/x` v0.4.41 by switching from `@sys.get_cli_args()` to `@env.args()`
+- Resolved all `moon check --deny-warn` warnings (deprecated idioms, unused imports/values, dead code)
+- Made `just info-check` effective by detecting regenerated `.mbti` files via `git status`
+- Made storage tests idempotent so repeated `moon test` runs pass
 
 ## [0.1.1] - 2026-09-06
 

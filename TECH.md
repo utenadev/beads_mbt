@@ -97,7 +97,7 @@ Using `moonbit-community/sqlite3` library.
 // Correct pattern
 let stmt = try storage.conn.prepare("INSERT INTO ... VALUES (?);") catch { ... }
 try stmt.bind(index=1, value) catch { ... }
-try stmt.step_once() catch { ... }
+ignore(stmt.step() catch { ... })  // step() returns Bool (row available)
 try stmt.finalize() catch { ... }
 
 // NULL values use empty string as placeholder
@@ -107,7 +107,7 @@ description: if description == "" { Option::None } else { Option::Some(descripti
 ## 5. Command Line Arguments
 
 ### Challenges:
-- `@sys.get_cli_args()` FFI broken in moonbitlang/x v0.4.41
+- `@sys.get_cli_args()` FFI issue on native targets (seen with older `moonbitlang/x`)
 - MoonBit doesn't support `fn main(argv)` syntax
 
 ### Solutions:
@@ -168,10 +168,11 @@ fn main() -> Unit {
 import {
   "utenadev/beads_mbt/lib",
   "moonbitlang/core/env",
-  "moonbitlang/x/sys",
 }
 
 pkgtype(kind: "executable")
+
+supported_targets = "native"
 ```
 
 ### Library Package (`lib/moon.pkg`)
@@ -181,9 +182,7 @@ import {
   "moonbitlang/x/fs",
 }
 
-import {
-  "moonbit-community/sqlite3",
-} for "test"
+supported_targets = "native"
 
 options(
   "export": [

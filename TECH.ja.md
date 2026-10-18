@@ -97,7 +97,7 @@ options(
 // 正しいパターン
 let stmt = try storage.conn.prepare("INSERT INTO ... VALUES (?);") catch { ... }
 try stmt.bind(index=1, value) catch { ... }
-try stmt.step_once() catch { ... }
+ignore(stmt.step() catch { ... })  // step() は Bool（行が取得できたか）を返す
 try stmt.finalize() catch { ... }
 
 // NULL 値は空文字列で代用
@@ -107,7 +107,7 @@ description: if description == "" { Option::None } else { Option::Some(descripti
 ## 5. コマンドライン引数
 
 ### 課題:
-- `@sys.get_cli_args()` が moonbitlang/x v0.4.41 で FFI エラー
+- ネイティブターゲットでの `@sys.get_cli_args()` の FFI 問題（旧 `moonbitlang/x` で発生）
 - MoonBit は `fn main(argv)` 構文をサポートしていない
 
 ### 対応:
@@ -168,10 +168,11 @@ fn main() -> Unit {
 import {
   "utenadev/beads_mbt/lib",
   "moonbitlang/core/env",
-  "moonbitlang/x/sys",
 }
 
 pkgtype(kind: "executable")
+
+supported_targets = "native"
 ```
 
 ### ライブラリパッケージ (`lib/moon.pkg`)
@@ -181,9 +182,7 @@ import {
   "moonbitlang/x/fs",
 }
 
-import {
-  "moonbit-community/sqlite3",
-} for "test"
+supported_targets = "native"
 
 options(
   "export": [
