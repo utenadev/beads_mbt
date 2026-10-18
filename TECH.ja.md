@@ -1,5 +1,7 @@
 # 移植ノート: beads_rust → beads_mbt
 
+[English](TECH.md) | [日本語](TECH.ja.md)
+
 このドキュメントは、[beads_rust](https://github.com/Dicklesworthstone/beads_rust) の MoonBit への移植時に遭遇した技術的課題と解決策を記録しています。
 
 ## 1. MoonBit の構文と型システム
