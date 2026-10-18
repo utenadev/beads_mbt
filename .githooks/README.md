@@ -4,6 +4,13 @@
 
 This pre-commit hook performs automatic checks before finalizing your commit.
 
+It runs:
+
+```bash
+moon fmt --check
+moon check --deny-warn --target native
+```
+
 ### Usage Instructions
 
 To use this pre-commit hook:
