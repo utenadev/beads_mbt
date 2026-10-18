@@ -50,15 +50,5 @@ e2e:
 # Pre-release check
 release-check: fmt info check test
 
-# Pre-release check on all supported targets
-release-check-all:
-    just release-check
-    just target=native check test
-
 # CI checks for the default target on a clean worktree
 ci: fmt-check info-check check test
-
-# CI checks across all supported targets
-ci-all:
-    just ci
-    just target=native check test
