@@ -1,6 +1,6 @@
 name = "utenadev/beads_mbt"
 
-version = "0.1.0"
+version = "0.2.0"
 
 import {
   "moonbit-community/sqlite3@0.2.3",

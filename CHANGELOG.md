@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-19
+
 ### Added
 - Machine-readable output: `--json` (alias `--robot`) and `--format json|text` on every command, writing results to stdout and failures as the beads_rust error envelope
 - Exit codes: `0` success, `1` internal, `2` database, `3` issue not found, `4` validation; human-mode errors now go to stderr so stdout stays pipeline clean
@@ -20,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - E2E test suite with 24 tests covering all CLI commands
 - 56 unit tests covering model, storage, output, and util modules
 - Japanese documentation (README.ja.md, TECH.ja.md)
+- GitHub release workflow that publishes `bm` (Linux/macOS) and `bm.exe` (Windows) release builds as assets when a `v*` tag is pushed
 
 ### Changed
 - `bm create` applies `--priority` (`0`-`4` / `P0`-`P4`) and `--type` instead of ignoring them

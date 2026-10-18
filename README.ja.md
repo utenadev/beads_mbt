@@ -22,7 +22,19 @@ moon build cmd/bm --target native
 moon install ./cmd/bm
 ```
 
-MoonBit はネイティブの実行ファイルを macOS / Linux も含めたすべてのプラットフォームで `bm.exe` という名前で出力するため、ビルド直後の成果物は `_build/native/debug/build/cmd/bm/bm.exe` です。`bm` という名前で `PATH` に置きたい場合は `moon install ./cmd/bm`（`just install` も同じ）を実行してください。実行ファイルは `~/.moon/bin` にインストールされ、macOS / Linux では `bm`、Windows では `bm.exe` になります。CI の成果物も同じ名前です。以下に示す `bm` の例は、バイナリが `PATH` 上で `bm` として利用できる前提です。
+MoonBit はネイティブの実行ファイルを macOS / Linux も含めたすべてのプラットフォームで `bm.exe` という名前で出力するため、ビルド直後の成果物は `_build/native/debug/build/cmd/bm/bm.exe` です。`bm` という名前で `PATH` に置きたい場合は `moon install ./cmd/bm`（`just install` も同じ）を実行してください。実行ファイルは `~/.moon/bin` にインストールされ、macOS / Linux では `bm`、Windows では `bm.exe` になります。以下に示す `bm` の例は、バイナリが `PATH` 上で `bm` として利用できる前提です。
+
+### 配布バイナリ
+
+タグを付けた[リリース](https://github.com/utenadev/beads_mbt/releases)にはリリースビルドを添付しています。
+
+| アセット | プラットフォーム |
+|---------|----------------|
+| `bm-linux-x86_64` | Linux x86_64 |
+| `bm-macos-arm64` | macOS（Apple silicon） |
+| `bm-windows-x86_64.exe` | Windows x86_64 |
+
+自分のプラットフォーム用のファイルをダウンロードし、実行権限を付けて（macOS / Linux では `chmod +x bm`）`PATH` の通った場所に置いてください。
 
 ## 使い方
 
