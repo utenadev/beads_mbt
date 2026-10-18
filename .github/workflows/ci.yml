@@ -33,7 +33,7 @@ jobs:
       run: moon version --all
     
     - name: Build native binary
-      run: moon build cmd/main --target native
+      run: moon build cmd/bm --target native
     
     - name: Run E2E tests
       run: bash scripts/e2e_test.sh
@@ -42,7 +42,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-linux
-        path: _build/native/debug/build/cmd/main/main.exe
+        path: _build/native/debug/build/cmd/bm/bm.exe
         if-no-files-found: error
 
   build-macos:
@@ -65,13 +65,13 @@ jobs:
       run: moon update
     
     - name: Build native binary
-      run: moon build cmd/main --target native
+      run: moon build cmd/bm --target native
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-macos
-        path: _build/native/debug/build/cmd/main/main.exe
+        path: _build/native/debug/build/cmd/bm/bm.exe
         if-no-files-found: error
 
   build-windows:
@@ -94,11 +94,11 @@ jobs:
       run: moon update
     
     - name: Build native binary
-      run: moon build cmd/main --target native
+      run: moon build cmd/bm --target native
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-windows
-        path: _build/native/debug/build/cmd/main/main.exe
+        path: _build/native/debug/build/cmd/bm/bm.exe
         if-no-files-found: error

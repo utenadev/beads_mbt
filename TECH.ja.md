@@ -163,7 +163,7 @@ fn main() -> Unit {
 
 ## 7. パッケージ設定
 
-### メインパッケージ (`cmd/main/moon.pkg`)
+### メインパッケージ (`cmd/bm/moon.pkg`)
 ```
 import {
   "utenadev/beads_mbt/lib",
@@ -205,12 +205,12 @@ options(
 
 ```bash
 # ビルド
-moon build cmd/main --target native
+moon build cmd/bm --target native
 
 # 実行
-moon run cmd/main -- init
-moon run cmd/main -- create "Issue title"
-moon run cmd/main -- list
+moon run cmd/bm -- init
+moon run cmd/bm -- create "Issue title"
+moon run cmd/bm -- list
 
 # テスト
 moon test

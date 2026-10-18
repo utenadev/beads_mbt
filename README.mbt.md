@@ -14,7 +14,7 @@ git clone https://github.com/utenadev/beads_mbt.git
 cd beads_mbt
 
 # Build
-moon build cmd/main --target native
+moon build cmd/bm --target native
 ```
 
 ## Quick Commands
@@ -38,73 +38,73 @@ just release-check-all  # release check on js + native
 
 ### Initialize
 ```bash
-moon run cmd/main -- init
+moon run cmd/bm -- init
 ```
 
 ### Create Issue
 ```bash
-moon run cmd/main -- create "Issue title"
+moon run cmd/bm -- create "Issue title"
 ```
 
 ### List Issues
 ```bash
-moon run cmd/main -- list
+moon run cmd/bm -- list
 ```
 
 ### Show Issue Details
 ```bash
-moon run cmd/main -- show "bd-xxxxxx"
+moon run cmd/bm -- show "bd-xxxxxx"
 ```
 
 ### Update Issue
 ```bash
-moon run cmd/main -- update "bd-xxxxxx" --title "New title"
+moon run cmd/bm -- update "bd-xxxxxx" --title "New title"
 ```
 
 ### Close Issue
 ```bash
-moon run cmd/main -- close "bd-xxxxxx"
+moon run cmd/bm -- close "bd-xxxxxx"
 ```
 
 ### Show Ready Issues
 ```bash
-moon run cmd/main -- ready
+moon run cmd/bm -- ready
 ```
 
 ### Defer Issue
 ```bash
-moon run cmd/main -- defer "bd-xxxxxx"
+moon run cmd/bm -- defer "bd-xxxxxx"
 ```
 
 ### Show Blocked Issues
 ```bash
-moon run cmd/main -- blocked
+moon run cmd/bm -- blocked
 ```
 
 ### Search Issues
 ```bash
-moon run cmd/main -- search "query"
+moon run cmd/bm -- search "query"
 ```
 
 ### Manage Dependencies
 ```bash
-moon run cmd/main -- dep add "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/main -- dep remove "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/main -- dep list "bd-xxxxxx"
+moon run cmd/bm -- dep add "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/bm -- dep remove "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/bm -- dep list "bd-xxxxxx"
 ```
 
 ### Manage Labels
 ```bash
-moon run cmd/main -- label add "bd-xxxxxx" "bug"
-moon run cmd/main -- label remove "bd-xxxxxx" "bug"
-moon run cmd/main -- label list "bd-xxxxxx"
-moon run cmd/main -- label list-all
+moon run cmd/bm -- label add "bd-xxxxxx" "bug"
+moon run cmd/bm -- label remove "bd-xxxxxx" "bug"
+moon run cmd/bm -- label list "bd-xxxxxx"
+moon run cmd/bm -- label list-all
 ```
 
 ### Manage Comments
 ```bash
-moon run cmd/main -- comments add "bd-xxxxxx" "Comment body"
-moon run cmd/main -- comments list "bd-xxxxxx"
+moon run cmd/bm -- comments add "bd-xxxxxx" "Comment body"
+moon run cmd/bm -- comments list "bd-xxxxxx"
 ```
 
 ## Implemented Features
@@ -131,10 +131,10 @@ moon run cmd/main -- comments list "bd-xxxxxx"
 ### Build Commands
 ```bash
 # Build
-moon build cmd/main --target native
+moon build cmd/bm --target native
 
 # Run
-moon run cmd/main -- <command>
+moon run cmd/bm -- <command>
 
 # Test
 moon test

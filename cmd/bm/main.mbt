@@ -1,7 +1,7 @@
 ///|
 /// Entry point for the beads CLI tool.
-/// Run with `moon run cmd/main -- <args>` from the project root.
-/// Build with `moon build cmd/main --target native` for native binary.
+/// Run with `moon run cmd/bm -- <args>` from the project root.
+/// Build with `moon build cmd/bm --target native` for native binary.
 fn main {
   let cli_args = @env.args()
 

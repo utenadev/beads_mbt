@@ -28,7 +28,7 @@ test-update:
 
 # Run main
 run:
-    moon run cmd/main --target {{target}}
+    moon run cmd/bm --target {{target}}
 
 # Generate type definition files
 info:

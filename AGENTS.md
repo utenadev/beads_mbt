@@ -41,27 +41,27 @@ When asking Qwen to implement features:
 
 3. **Build and test**
    ```bash
-   moon build cmd/main --target native
-   moon run cmd/main -- <args>
+   moon build cmd/bm --target native
+   moon run cmd/bm -- <args>
    ```
 
 ## Key Commands
 
 ```bash
 # Initialize
-moon run cmd/main -- init
+moon run cmd/bm -- init
 
 # Create issue
-moon run cmd/main -- create "Issue title"
+moon run cmd/bm -- create "Issue title"
 
 # List issues
-moon run cmd/main -- list
+moon run cmd/bm -- list
 
 # Show issue
-moon run cmd/main -- show "bd-123456"
+moon run cmd/bm -- show "bd-123456"
 
 # Search with Gemini (via MCP)
-moon run cmd/main -- search "MoonBit YAML parser"
+moon run cmd/bm -- search "MoonBit YAML parser"
 ```
 
 ## Database
@@ -99,7 +99,7 @@ beads_mbt の Issue 作成機能を実装して。
 ### ビルドコマンドを共有
 
 ```bash
-moon build cmd/main --target native
+moon build cmd/bm --target native
 ```
 
 ### エラーをそのまま共有

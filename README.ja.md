@@ -14,7 +14,7 @@ git clone https://github.com/utenadev/beads_mbt.git
 cd beads_mbt
 
 # ビルド
-moon build cmd/main --target native
+moon build cmd/bm --target native
 ```
 
 ## クイックコマンド
@@ -38,73 +38,73 @@ just release-check-all  # リリース前チェック
 
 ### 初期化
 ```bash
-moon run cmd/main -- init
+moon run cmd/bm -- init
 ```
 
 ### Issue 作成
 ```bash
-moon run cmd/main -- create "Issue のタイトル"
+moon run cmd/bm -- create "Issue のタイトル"
 ```
 
 ### Issue 一覧表示
 ```bash
-moon run cmd/main -- list
+moon run cmd/bm -- list
 ```
 
 ### Issue 詳細表示
 ```bash
-moon run cmd/main -- show "bd-xxxxxx"
+moon run cmd/bm -- show "bd-xxxxxx"
 ```
 
 ### Issue 更新
 ```bash
-moon run cmd/main -- update "bd-xxxxxx" --title "新しいタイトル"
+moon run cmd/bm -- update "bd-xxxxxx" --title "新しいタイトル"
 ```
 
 ### Issue 完了
 ```bash
-moon run cmd/main -- close "bd-xxxxxx"
+moon run cmd/bm -- close "bd-xxxxxx"
 ```
 
 ### 着手可能 Issue 表示
 ```bash
-moon run cmd/main -- ready
+moon run cmd/bm -- ready
 ```
 
 ### Issue 延期
 ```bash
-moon run cmd/main -- defer "bd-xxxxxx"
+moon run cmd/bm -- defer "bd-xxxxxx"
 ```
 
 ### ブロック中 Issue 表示
 ```bash
-moon run cmd/main -- blocked
+moon run cmd/bm -- blocked
 ```
 
 ### Issue 検索
 ```bash
-moon run cmd/main -- search "検索クエリ"
+moon run cmd/bm -- search "検索クエリ"
 ```
 
 ### 依存関係の管理
 ```bash
-moon run cmd/main -- dep add "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/main -- dep remove "bd-xxxxxx" "bd-yyyyyy"
-moon run cmd/main -- dep list "bd-xxxxxx"
+moon run cmd/bm -- dep add "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/bm -- dep remove "bd-xxxxxx" "bd-yyyyyy"
+moon run cmd/bm -- dep list "bd-xxxxxx"
 ```
 
 ### ラベルの管理
 ```bash
-moon run cmd/main -- label add "bd-xxxxxx" "bug"
-moon run cmd/main -- label remove "bd-xxxxxx" "bug"
-moon run cmd/main -- label list "bd-xxxxxx"
-moon run cmd/main -- label list-all
+moon run cmd/bm -- label add "bd-xxxxxx" "bug"
+moon run cmd/bm -- label remove "bd-xxxxxx" "bug"
+moon run cmd/bm -- label list "bd-xxxxxx"
+moon run cmd/bm -- label list-all
 ```
 
 ### コメントの管理
 ```bash
-moon run cmd/main -- comments add "bd-xxxxxx" "コメント本文"
-moon run cmd/main -- comments list "bd-xxxxxx"
+moon run cmd/bm -- comments add "bd-xxxxxx" "コメント本文"
+moon run cmd/bm -- comments list "bd-xxxxxx"
 ```
 
 ## 実装済み機能
@@ -131,10 +131,10 @@ moon run cmd/main -- comments list "bd-xxxxxx"
 ### ビルドコマンド
 ```bash
 # ビルド
-moon build cmd/main --target native
+moon build cmd/bm --target native
 
 # 実行
-moon run cmd/main -- <command>
+moon run cmd/bm -- <command>
 
 # テスト
 moon test

@@ -51,7 +51,7 @@ setup() {
 
 # Run a command and capture output
 run_cmd() {
-    moon run cmd/main -- "$@" 2>&1
+    moon run cmd/bm -- "$@" 2>&1
 }
 
 # ============================================================================

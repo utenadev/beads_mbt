@@ -18,8 +18,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Upgraded MoonBit toolchain to `moon` 0.1.20261012 (`moonc` v0.10.15)
 - Bumped dependencies: `moonbit-community/sqlite3` 0.1.3 → 0.2.3, `moonbitlang/x` 0.4.41 → 0.5.5
 - Migrated to the sqlite3 0.2.3 API (`step_once()` → `step()`, `Int64` column reads)
-- Removed unused `cmd/main/cli.mbt` dead code
+- Removed unused `cmd/bm/cli.mbt` dead code
 - Declared `supported_targets = "native"` in all packages
+- Renamed the CLI package `cmd/main` → `cmd/bm`; the built binary is now `bm`
+- Help, version, and usage messages now display `bm` instead of `beads`
 
 ### Fixed
 - Fixed FFI linker error with `moonbitlang/x` v0.4.41 by switching from `@sys.get_cli_args()` to `@env.args()`
