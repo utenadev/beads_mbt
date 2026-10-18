@@ -61,24 +61,28 @@ match @lib.open(db_path) {
 ## 3. パッケージシステム
 
 ### 課題:
-- `moon.pkg.json` でのインポート/エクスポート宣言が必要
+- `moon.pkg` でのインポート/エクスポート宣言が必要
 - 同じパッケージ内のファイル間でも明示的なエクスポートが必要
 
 ### 対応:
-```json
-{
-  "import": [
-    "moonbit-community/sqlite3"
-  ],
+```
+import {
+  "moonbit-community/sqlite3",
+}
+
+options(
   "export": [
     "open",
     "close",
     "insert_issue",
     "get_issue_by_id",
-    "list_issues"
-  ]
-}
+    "list_issues",
+  ],
+)
 ```
+
+> 補足: 新しい MoonBit ツールチェーンでは、旧来の `moon.pkg.json`（JSON）は
+> 上記の `moon.pkg` ブロック構文に置き換わっています。
 
 ## 4. SQLite バインディング
 
@@ -160,24 +164,28 @@ fn main() -> Unit {
 ## 7. パッケージ設定
 
 ### メインパッケージ (`cmd/main/moon.pkg`)
-```json
-{
-  "import": [
-    "utenadev/beads_mbt/lib" @lib,
-    "moonbitlang/core/env" @env,
-    "moonbitlang/x/sys" @sys
-  ],
-  "options": { "is-main": true }
+```
+import {
+  "utenadev/beads_mbt/lib",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
 }
+
+pkgtype(kind: "executable")
 ```
 
-### ライブラリパッケージ (`lib/moon.pkg.json`)
-```json
-{
-  "import": [
-    "moonbit-community/sqlite3",
-    "moonbitlang/x/fs"
-  ],
+### ライブラリパッケージ (`lib/moon.pkg`)
+```
+import {
+  "moonbit-community/sqlite3",
+  "moonbitlang/x/fs",
+}
+
+import {
+  "moonbit-community/sqlite3",
+} for "test"
+
+options(
   "export": [
     "open", "close", "set_config", "get_config",
     "insert_issue", "get_issue_by_id", "list_issues",
@@ -189,9 +197,9 @@ fn main() -> Unit {
     "search_issues", "add_comment", "get_comments",
     "init_workspace", "make_issue", "generate_issue_id",
     "status_to_string", "string_to_status",
-    "issue_type_to_string", "string_to_issue_type"
-  ]
-}
+    "issue_type_to_string", "string_to_issue_type",
+  ],
+)
 ```
 
 ## 8. ビルドとテストコマンド
@@ -217,16 +225,12 @@ moon info
 
 ## 9. 既知の制限
 
-1. **JSONL sync**: 未実装
-2. **依存関係**: ブロック関係管理（部分的に実装済み）
-3. **ラベル/コメント**: 未実装
-4. **エラーメッセージ**: 英語のみ
-5. **Windows テスト**: CI カバレッジが限定的
+1. **JSONL sync**: 未実装（`sync` はプレースホルダーメッセージを表示）
+2. **エラーメッセージ**: 英語のみ
+3. **Windows テスト**: CI カバレッジが限定的
 
 ## 10. 今後の作業
 
 1. **JSONL sync**: データベースから JSONL への同期
-2. **依存関係**: 完全なブロック関係管理
-3. **ラベル/コメント**: 完全実装
-4. **テスト**: 包括的なテストスイート
-5. **ドキュメント**: 既存ドキュメントの拡充
+2. **テスト**: 包括的なテストスイート
+3. **ドキュメント**: 既存ドキュメントの拡充

@@ -61,24 +61,28 @@ match @lib.open(db_path) {
 ## 3. Package System
 
 ### Challenges:
-- Import/export declarations required in `moon.pkg.json`
+- Import/export declarations required in `moon.pkg`
 - Explicit exports needed even for files in the same package
 
 ### Solutions:
-```json
-{
-  "import": [
-    "moonbit-community/sqlite3"
-  ],
+```
+import {
+  "moonbit-community/sqlite3",
+}
+
+options(
   "export": [
     "open",
     "close",
     "insert_issue",
     "get_issue_by_id",
-    "list_issues"
-  ]
-}
+    "list_issues",
+  ],
+)
 ```
+
+> Note: newer MoonBit toolchains replaced the old `moon.pkg.json` (JSON)
+> with the `moon.pkg` block syntax shown above.
 
 ## 4. SQLite Bindings
 
@@ -160,24 +164,28 @@ fn main() -> Unit {
 ## 7. Package Configuration
 
 ### Main Package (`cmd/main/moon.pkg`)
-```json
-{
-  "import": [
-    "utenadev/beads_mbt/lib" @lib,
-    "moonbitlang/core/env" @env,
-    "moonbitlang/x/sys" @sys
-  ],
-  "options": { "is-main": true }
+```
+import {
+  "utenadev/beads_mbt/lib",
+  "moonbitlang/core/env",
+  "moonbitlang/x/sys",
 }
+
+pkgtype(kind: "executable")
 ```
 
-### Library Package (`lib/moon.pkg.json`)
-```json
-{
-  "import": [
-    "moonbit-community/sqlite3",
-    "moonbitlang/x/fs"
-  ],
+### Library Package (`lib/moon.pkg`)
+```
+import {
+  "moonbit-community/sqlite3",
+  "moonbitlang/x/fs",
+}
+
+import {
+  "moonbit-community/sqlite3",
+} for "test"
+
+options(
   "export": [
     "open", "close", "set_config", "get_config",
     "insert_issue", "get_issue_by_id", "list_issues",
@@ -189,9 +197,9 @@ fn main() -> Unit {
     "search_issues", "add_comment", "get_comments",
     "init_workspace", "make_issue", "generate_issue_id",
     "status_to_string", "string_to_status",
-    "issue_type_to_string", "string_to_issue_type"
-  ]
-}
+    "issue_type_to_string", "string_to_issue_type",
+  ],
+)
 ```
 
 ## 8. Build and Test Commands
@@ -217,16 +225,12 @@ moon info
 
 ## 9. Known Limitations
 
-1. **JSONL sync**: Not implemented
-2. **Dependencies**: Block relationship management (partially implemented)
-3. **Labels/Comments**: Not implemented
-4. **Error messages**: English only
-5. **Windows testing**: Limited CI coverage
+1. **JSONL sync**: Not implemented (`sync` prints a placeholder message)
+2. **Error messages**: English only
+3. **Windows testing**: Limited CI coverage
 
 ## 10. Future Work
 
 1. **JSONL sync**: Database to JSONL synchronization
-2. **Dependencies**: Full block relationship management
-3. **Labels/Comments**: Full implementation
-4. **Tests**: Comprehensive test suite
-5. **Documentation**: Enhance existing docs
+2. **Tests**: Comprehensive test suite
+3. **Documentation**: Enhance existing docs
