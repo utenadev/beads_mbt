@@ -27,8 +27,22 @@ included, so the raw build output is
 `_build/native/debug/build/cmd/bm/bm.exe`. To get a plain `bm` on your `PATH`,
 install it with `moon install ./cmd/bm` (`just install` does the same): the
 executable lands in `~/.moon/bin` as `bm` on macOS and Linux and as `bm.exe` on
-Windows, and the CI artifacts use the same names. The `bm` examples below assume
-the binary is available as `bm` on your `PATH`.
+Windows. The `bm` examples below assume the binary is available as `bm` on your
+`PATH`.
+
+### Prebuilt binaries
+
+Each tagged [release](https://github.com/utenadev/beads_mbt/releases) ships the
+release builds:
+
+| Asset | Platform |
+|-------|----------|
+| `bm-linux-x86_64` | Linux, x86_64 |
+| `bm-macos-arm64` | macOS, Apple silicon |
+| `bm-windows-x86_64.exe` | Windows, x86_64 |
+
+Download the one for your platform, make it executable (`chmod +x bm` on macOS
+and Linux), and put it on your `PATH`.
 
 ## Usage
 

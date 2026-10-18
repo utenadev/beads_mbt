@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.asset }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs-on: ubuntu-latest
+            binary: bm
+            asset: bm-linux-x86_64
+          - runs-on: macos-latest
+            binary: bm
+            asset: bm-macos-arm64
+          - runs-on: windows-latest
+            binary: bm.exe
+            asset: bm-windows-x86_64.exe
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MoonBit
+      uses: hustcer/setup-moonbit@v1
+      with:
+        version: latest
+
+    - name: Update MoonBit registry
+      run: moon update
+
+    # MoonBit always names the native artifact `bm.exe`, so the asset is
+    # staged under the platform-specific name the release publishes.
+    - name: Build native binary (release)
+      run: moon build cmd/bm --target native --release
+
+    - name: Stage release asset
+      shell: bash
+      run: cp "_build/native/release/build/cmd/bm/${{ matrix.binary }}" "${{ matrix.asset }}"
+
+    - name: Upload release asset
+      uses: actions/upload-artifact@v4
+      with:
+        name: ${{ matrix.asset }}
+        path: ${{ matrix.asset }}
+        if-no-files-found: error
+
+  publish:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Download release assets
+      uses: actions/download-artifact@v4
+      with:
+        path: dist
+        merge-multiple: true
+
+    - name: Publish GitHub release
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes
