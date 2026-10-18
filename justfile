@@ -30,6 +30,10 @@ test-update:
 run:
     moon run cmd/bm --target {{target}}
 
+# Install the CLI as `bm` (`bm.exe` on Windows) into ~/.moon/bin
+install:
+    moon install ./cmd/bm
+
 # Generate type definition files
 info:
     moon info

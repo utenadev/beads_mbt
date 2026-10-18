@@ -17,9 +17,12 @@ cd beads_mbt
 
 # ネイティブバイナリのビルド
 moon build cmd/bm --target native
+
+# 任意: `bm`（Windows では `bm.exe`）として ~/.moon/bin にインストール
+moon install ./cmd/bm
 ```
 
-ビルドされた実行ファイルは `_build/native/debug/build/cmd/bm/bm.exe` に出力されます。以下の `bm` の例は、バイナリが `PATH` 上で `bm` として利用できる前提です。`PATH` の通ったディレクトリへコピーまたはシンボリックリンクするか、フルパスで実行してください。
+MoonBit はネイティブの実行ファイルを macOS / Linux も含めたすべてのプラットフォームで `bm.exe` という名前で出力するため、ビルド直後の成果物は `_build/native/debug/build/cmd/bm/bm.exe` です。`bm` という名前で `PATH` に置きたい場合は `moon install ./cmd/bm`（`just install` も同じ）を実行してください。実行ファイルは `~/.moon/bin` にインストールされ、macOS / Linux では `bm`、Windows では `bm.exe` になります。CI の成果物も同じ名前です。以下に示す `bm` の例は、バイナリが `PATH` 上で `bm` として利用できる前提です。
 
 ## 使い方
 

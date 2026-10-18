@@ -40,8 +40,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bumped dependencies: `moonbit-community/sqlite3` 0.1.3 → 0.2.3, `moonbitlang/x` 0.4.41 → 0.5.5
 - Migrated to the sqlite3 0.2.3 API (`step_once()` → `step()`, `Int64` column reads)
 - Declared `supported_targets = "native"` in all packages
-- Renamed the CLI package `cmd/main` → `cmd/bm`; the built binary is now `bm`
+- Renamed the CLI package `cmd/main` → `cmd/bm`; the build output is `_build/native/debug/build/cmd/bm/bm.exe`
 - Help, version, and usage messages now display `bm` instead of `beads`
+- `moon install ./cmd/bm` (also `just install`) installs the CLI as `bm` on macOS and Linux and as `bm.exe` on Windows, and the Linux/macOS CI artifacts now ship as `bm`; MoonBit names the raw build output `bm.exe` on every platform
 
 ### Fixed
 - `is_blocked` now ignores dependency types that never block (`related`, etc.), keeps blocking when the target is unknown, treats every non-closed blocker as open, and propagates a parent's blocked state to its children
