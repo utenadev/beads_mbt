@@ -1,5 +1,7 @@
 # beads_mbt - Beads in MoonBit
 
+[English](README.md) | [日本語](README.ja.md)
+
 A MoonBit port of [beads_rust](https://github.com/Dicklesworthstone/beads_rust) - a local-first issue tracker for git repositories.
 
 ## Overview
