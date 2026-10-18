@@ -2,6 +2,18 @@
 /// Blackbox tests run against the package's public API.
 /// Prefer high-level behaviors over implementation details.
 /// Run `moon test` to execute and `moon test --update` to refresh snapshots.
+
+///|
+/// Remove any leftover database file, then open a fresh connection.
+/// Keeps the storage tests idempotent across repeated runs.
+fn open_fresh(path : String) -> Result[@lib.BeadsStorage, String] {
+  @fs.remove_file(path) catch {
+    _ => ()
+  }
+  @lib.open(path)
+}
+
+///|
 test "model: make_issue creates issue with defaults" {
   let issue = @lib.make_issue("bd-123456", "Test issue")
 
@@ -108,7 +120,7 @@ test "model: round-trip issue type conversion" {
 
 ///|
 test "storage: open creates database and schema" {
-  match @lib.open("/tmp/test_schema.db") {
+  match open_fresh("/tmp/test_schema.db") {
     Ok(storage) => @lib.close(storage)
     Err(_) => assert_eq(true, false)
   }
@@ -116,7 +128,7 @@ test "storage: open creates database and schema" {
 
 ///|
 test "storage: insert and get issue" {
-  match @lib.open("/tmp/beads_test_insert.db") {
+  match open_fresh("/tmp/beads_test_insert.db") {
     Ok(storage) => {
       match
         @lib.insert_issue(storage, @lib.make_issue("bd-test123", "Test issue")) {
@@ -142,7 +154,7 @@ test "storage: insert and get issue" {
 
 ///|
 test "storage: list_issues returns all issues" {
-  match @lib.open("/tmp/beads_test_list.db") {
+  match open_fresh("/tmp/beads_test_list.db") {
     Ok(storage) => {
       ignore(@lib.insert_issue(storage, @lib.make_issue("bd-1", "Issue 1")))
       ignore(@lib.insert_issue(storage, @lib.make_issue("bd-2", "Issue 2")))
@@ -165,7 +177,7 @@ test "storage: list_issues returns all issues" {
 
 ///|
 test "storage: update_issue_status" {
-  match @lib.open("/tmp/beads_test_status.db") {
+  match open_fresh("/tmp/beads_test_status.db") {
     Ok(storage) => {
       ignore(
         @lib.insert_issue(storage, @lib.make_issue("bd-status1", "Status test")),
@@ -187,7 +199,7 @@ test "storage: update_issue_status" {
 
 ///|
 test "storage: get_ready_issues" {
-  match @lib.open("/tmp/beads_test_ready.db") {
+  match open_fresh("/tmp/beads_test_ready.db") {
     Ok(storage) => {
       ignore(
         @lib.insert_issue(storage, @lib.make_issue("bd-ready1", "Ready issue")),
@@ -213,7 +225,7 @@ test "storage: get_ready_issues" {
 
 ///|
 test "storage: update_issue_title" {
-  match @lib.open("/tmp/beads_test_title.db") {
+  match open_fresh("/tmp/beads_test_title.db") {
     Ok(storage) => {
       ignore(
         @lib.insert_issue(storage, @lib.make_issue("bd-title1", "Old title")),
@@ -234,7 +246,7 @@ test "storage: update_issue_title" {
 
 ///|
 test "storage: update_issue_priority" {
-  match @lib.open("/tmp/beads_test_priority.db") {
+  match open_fresh("/tmp/beads_test_priority.db") {
     Ok(storage) => {
       ignore(
         @lib.insert_issue(
@@ -258,7 +270,7 @@ test "storage: update_issue_priority" {
 
 ///|
 test "storage: defer_issue" {
-  match @lib.open("/tmp/beads_test_defer.db") {
+  match open_fresh("/tmp/beads_test_defer.db") {
     Ok(storage) => {
       ignore(
         @lib.insert_issue(storage, @lib.make_issue("bd-defer1", "Defer test")),
@@ -280,7 +292,7 @@ test "storage: defer_issue" {
 
 ///|
 test "storage: add_dependency" {
-  match @lib.open("/tmp/beads_test_dep.db") {
+  match open_fresh("/tmp/beads_test_dep.db") {
     Ok(storage) => {
       ignore(@lib.insert_issue(storage, @lib.make_issue("bd-dep1", "Dep 1")))
       ignore(@lib.insert_issue(storage, @lib.make_issue("bd-dep2", "Dep 2")))

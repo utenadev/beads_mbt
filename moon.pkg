@@ -1,5 +1,6 @@
 import {
   "utenadev/beads_mbt/lib",
+  "moonbitlang/x/fs",
 } for "test"
 
 supported_targets = "native"
