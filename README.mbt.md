@@ -17,11 +17,18 @@ cd beads_mbt
 
 # Build the native binary
 moon build cmd/bm --target native
+
+# Optional: install it as `bm` (`bm.exe` on Windows) into ~/.moon/bin
+moon install ./cmd/bm
 ```
 
-The build writes the executable to `_build/native/debug/build/cmd/bm/bm.exe`.
-The `bm` examples below assume the binary is available as `bm` on your `PATH`;
-copy or symlink it there, or invoke it by its full path.
+MoonBit names the native artifact `bm.exe` on every platform, macOS and Linux
+included, so the raw build output is
+`_build/native/debug/build/cmd/bm/bm.exe`. To get a plain `bm` on your `PATH`,
+install it with `moon install ./cmd/bm` (`just install` does the same): the
+executable lands in `~/.moon/bin` as `bm` on macOS and Linux and as `bm.exe` on
+Windows, and the CI artifacts use the same names. The `bm` examples below assume
+the binary is available as `bm` on your `PATH`.
 
 ## Usage
 

@@ -64,11 +64,14 @@ jobs:
     - name: Run E2E tests
       run: bash scripts/e2e_test.sh
     
+    - name: Stage binary as bm
+      run: cp _build/native/debug/build/cmd/bm/bm.exe bm
+
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-linux
-        path: _build/native/debug/build/cmd/bm/bm.exe
+        path: bm
         if-no-files-found: error
 
   build-macos:
@@ -93,11 +96,14 @@ jobs:
     - name: Build native binary
       run: moon build cmd/bm --target native
     
+    - name: Stage binary as bm
+      run: cp _build/native/debug/build/cmd/bm/bm.exe bm
+
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-macos
-        path: _build/native/debug/build/cmd/bm/bm.exe
+        path: bm
         if-no-files-found: error
 
   build-windows:
@@ -126,5 +132,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-windows
+        # Windows keeps the `.exe` suffix
         path: _build/native/debug/build/cmd/bm/bm.exe
         if-no-files-found: error
