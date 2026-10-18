@@ -296,7 +296,13 @@ test "storage: add_dependency" {
     Ok(storage) => {
       ignore(@lib.insert_issue(storage, @lib.make_issue("bd-dep1", "Dep 1")))
       ignore(@lib.insert_issue(storage, @lib.make_issue("bd-dep2", "Dep 2")))
-      match @lib.add_dependency(storage, "bd-dep1", "bd-dep2") {
+      match
+        @lib.add_dependency(
+          storage,
+          "bd-dep1",
+          "bd-dep2",
+          @lib.default_dependency_type(),
+        ) {
         Ok(_) => ()
         Err(_) => assert_eq(true, false)
       }
@@ -349,4 +355,549 @@ test "model: Status enum equality" {
     @lib.status_to_string(open1) == @lib.status_to_string(closed),
     false,
   )
+}
+
+// ============================================================================
+// Step 1: parsing, blocking semantics, search, and schema migration
+// ============================================================================
+
+///|
+/// Build an issue with every field spelled out, so tests can control values
+/// that `make_issue` leaves at its defaults (timestamps, descriptions, status).
+fn build_issue(
+  id : String,
+  title : String,
+  priority : Int32,
+  created_at : Int32,
+  description : String?,
+  status : @lib.Status,
+) -> @lib.Issue {
+  @lib.Issue::{
+    id,
+    title,
+    type_: @lib.IssueType::Task,
+    priority,
+    status,
+    description,
+    assignee: Option::None,
+    owner: Option::None,
+    created_at,
+    updated_at: created_at,
+    is_ephemeral: false,
+  }
+}
+
+///|
+/// `is_blocked` as a plain bool; a storage error fails the test.
+fn is_blocked_or_fail(storage : @lib.BeadsStorage, id : String) -> Bool {
+  match @lib.is_blocked(storage, id) {
+    Ok(value) => value
+    Err(_) => abort("is_blocked returned an error")
+  }
+}
+
+///|
+/// The ready issues as a comma-separated id list, so ordering is easy to read.
+fn ready_ids(storage : @lib.BeadsStorage) -> String {
+  match @lib.get_ready_issues(storage) {
+    Ok(issues) => {
+      let ids : Array[String] = []
+      for issue in issues {
+        Array::push(ids, issue.id)
+      }
+      ids.join(",")
+    }
+    Err(_) => abort("get_ready_issues returned an error")
+  }
+}
+
+///|
+/// Search results as a comma-separated id list, so ordering is easy to read.
+fn search_ids(storage : @lib.BeadsStorage, query : String) -> String {
+  match @lib.search_issues(storage, query) {
+    Ok(issues) => {
+      let ids : Array[String] = []
+      for issue in issues {
+        Array::push(ids, issue.id)
+      }
+      ids.join(",")
+    }
+    Err(_) => abort("search_issues returned an error")
+  }
+}
+
+///|
+/// The number of search hits, without listing them.
+fn search_count(storage : @lib.BeadsStorage, query : String) -> Int32 {
+  match @lib.search_issues(storage, query) {
+    Ok(issues) => issues.length()
+    Err(_) => abort("search_issues returned an error")
+  }
+}
+
+///|
+/// Write a database that predates typed dependencies, so the migration path
+/// can be exercised without an old binary.
+fn write_legacy_database(path : String) -> Unit {
+  @fs.remove_file(path) catch {
+    _ => ()
+  }
+  let conn = @sqlite3.Connection::open(path) catch {
+    _ => abort("cannot open the legacy database")
+  }
+  let statements = [
+    "CREATE TABLE issues (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'other', priority INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'open', description TEXT, assignee TEXT, owner TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, closed_at INTEGER, closed_reason TEXT, parent TEXT, estimate INTEGER, due_date INTEGER, external_ref TEXT, is_ephemeral INTEGER NOT NULL DEFAULT 0);",
+    "CREATE TABLE issue_dependencies (issue_id TEXT NOT NULL, depends_on TEXT NOT NULL, PRIMARY KEY (issue_id, depends_on), FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE, FOREIGN KEY (depends_on) REFERENCES issues(id) ON DELETE CASCADE);",
+    "INSERT INTO issues (id, title, created_at, updated_at) VALUES ('bd-legacy1', 'Legacy blocker', 1, 1);",
+    "INSERT INTO issues (id, title, created_at, updated_at) VALUES ('bd-legacy2', 'Legacy blocked', 2, 2);",
+    "INSERT INTO issue_dependencies (issue_id, depends_on) VALUES ('bd-legacy2', 'bd-legacy1');",
+  ]
+  for sql in statements {
+    let stmt = conn.prepare(sql) catch {
+      _ => abort("cannot prepare a legacy statement")
+    }
+    ignore(stmt.step() catch { _ => abort("cannot run a legacy statement") })
+    stmt.finalize() catch {
+      _ => ()
+    }
+  }
+  conn.close() catch {
+    _ => ()
+  }
+}
+
+///|
+test "model: parse_priority accepts 0-4 and P0-P4" {
+  assert_eq(@lib.parse_priority("0"), Ok(0))
+  assert_eq(@lib.parse_priority("4"), Ok(4))
+  assert_eq(@lib.parse_priority("P0"), Ok(0))
+  assert_eq(@lib.parse_priority("p3"), Ok(3))
+  assert_eq(@lib.parse_priority("P4"), Ok(4))
+}
+
+///|
+/// `parse_issue_type` as its canonical name; a rejected value fails the test.
+fn parse_type(input : String) -> String {
+  match @lib.parse_issue_type(input) {
+    Ok(value) => @lib.issue_type_to_string(value)
+    Err(_) => abort("parse_issue_type rejected: " + input)
+  }
+}
+
+///|
+test "model: parse_priority rejects anything else" {
+  assert_eq(@lib.parse_priority("9") is Err(_), true)
+  assert_eq(@lib.parse_priority("P9") is Err(_), true)
+  assert_eq(@lib.parse_priority("high") is Err(_), true)
+  assert_eq(@lib.parse_priority("") is Err(_), true)
+}
+
+///|
+test "model: parse_issue_type accepts the documented types" {
+  assert_eq(parse_type("bug"), "bug")
+  assert_eq(parse_type("feature"), "feature")
+  assert_eq(parse_type("task"), "task")
+  assert_eq(parse_type("documentation"), "documentation")
+  assert_eq(parse_type("docs"), "documentation")
+  assert_eq(parse_type("question"), "question")
+  assert_eq(parse_type("other"), "other")
+}
+
+///|
+test "model: parse_issue_type rejects unknown types" {
+  assert_eq(@lib.parse_issue_type("nonsense") is Err(_), true)
+  assert_eq(@lib.parse_issue_type("") is Err(_), true)
+}
+
+///|
+test "model: is_blocking_dependency_type follows beads_rust" {
+  assert_eq(@lib.default_dependency_type(), "blocks")
+  assert_eq(@lib.is_blocking_dependency_type("blocks"), true)
+  assert_eq(@lib.is_blocking_dependency_type("conditional-blocks"), true)
+  assert_eq(@lib.is_blocking_dependency_type("waits-for"), true)
+  assert_eq(@lib.is_blocking_dependency_type("related"), false)
+  assert_eq(@lib.is_blocking_dependency_type("discovered-from"), false)
+  // a child inherits its parent's blocked state, the edge itself does not block
+  assert_eq(@lib.is_blocking_dependency_type("parent-child"), false)
+}
+
+///|
+test "storage: is_blocked only considers blocking dependency types" {
+  match open_fresh("/tmp/beads_test_blocked_types.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-t1", "Blocker")))
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-t2", "Blocking edge")),
+      )
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-t3", "Related edge")),
+      )
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-t4", "Dangling edge")),
+      )
+      ignore(@lib.add_dependency(storage, "bd-t2", "bd-t1", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-t3", "bd-t1", "related"))
+      ignore(@lib.add_dependency(storage, "bd-t4", "bd-missing", "blocks"))
+
+      assert_eq(is_blocked_or_fail(storage, "bd-t1"), false)
+      assert_eq(is_blocked_or_fail(storage, "bd-t2"), true)
+      assert_eq(is_blocked_or_fail(storage, "bd-t3"), false)
+      // an edge whose target is unknown keeps blocking
+      assert_eq(is_blocked_or_fail(storage, "bd-t4"), true)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: is_blocked follows the blocker's status" {
+  match open_fresh("/tmp/beads_test_blocked_status.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-s1", "Blocker")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-s2", "Waiting")))
+      ignore(@lib.add_dependency(storage, "bd-s2", "bd-s1", "blocks"))
+
+      assert_eq(is_blocked_or_fail(storage, "bd-s2"), true)
+
+      // deferred is not done, so it still blocks
+      ignore(@lib.defer_issue(storage, "bd-s1"))
+      assert_eq(is_blocked_or_fail(storage, "bd-s2"), true)
+
+      ignore(@lib.update_issue_status(storage, "bd-s1", "closed"))
+      assert_eq(is_blocked_or_fail(storage, "bd-s2"), false)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: a child inherits its parent's blocked state" {
+  match open_fresh("/tmp/beads_test_parent_child.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p0", "Blocker")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p1", "Parent")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p2", "Child")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p3", "Grandchild")))
+      ignore(@lib.add_dependency(storage, "bd-p1", "bd-p0", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-p2", "bd-p1", "parent-child"))
+      ignore(@lib.add_dependency(storage, "bd-p3", "bd-p2", "parent-child"))
+
+      assert_eq(is_blocked_or_fail(storage, "bd-p1"), true)
+      assert_eq(is_blocked_or_fail(storage, "bd-p2"), true)
+      assert_eq(is_blocked_or_fail(storage, "bd-p3"), true)
+
+      ignore(@lib.update_issue_status(storage, "bd-p0", "closed"))
+      assert_eq(is_blocked_or_fail(storage, "bd-p1"), false)
+      assert_eq(is_blocked_or_fail(storage, "bd-p2"), false)
+      assert_eq(is_blocked_or_fail(storage, "bd-p3"), false)
+
+      // parent-child alone never blocks
+      ignore(@lib.update_issue_status(storage, "bd-p0", "open"))
+      ignore(@lib.remove_dependency(storage, "bd-p1", "bd-p0"))
+      assert_eq(is_blocked_or_fail(storage, "bd-p2"), false)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: get_ready_issues drops blocked issues and orders by priority" {
+  match open_fresh("/tmp/beads_test_ready_order.db") {
+    Ok(storage) => {
+      // Three ready issues and one blocker that holds back `bd-r-blocked`.
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-r-old-low",
+            "Older low priority",
+            3,
+            100,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-r-new-high",
+            "Newer high priority",
+            1,
+            200,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-r-new-low",
+            "Newer low priority",
+            3,
+            300,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-r-blocked",
+            "Blocked",
+            0,
+            400,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-r-hold", "Holder")))
+      ignore(
+        @lib.add_dependency(storage, "bd-r-blocked", "bd-r-hold", "blocks"),
+      )
+
+      // priority first, then newest, and the blocked issue never shows up
+      assert_eq(
+        ready_ids(storage),
+        "bd-r-new-high,bd-r-hold,bd-r-new-low,bd-r-old-low",
+      )
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: get_blocked_issues skips closed issues" {
+  match open_fresh("/tmp/beads_test_blocked_list.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-l1", "Holder")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-l2", "Waiting")))
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-l3", "Waiting too")),
+      )
+      ignore(@lib.add_dependency(storage, "bd-l2", "bd-l1", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-l3", "bd-l1", "blocks"))
+      ignore(@lib.update_issue_status(storage, "bd-l3", "closed"))
+
+      match @lib.get_blocked_issues(storage) {
+        Ok(issues) => {
+          assert_eq(issues.length(), 1)
+          assert_eq(issues[0].id, "bd-l2")
+        }
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: typed dependencies coexist for the same pair" {
+  match open_fresh("/tmp/beads_test_typed_dep.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-d1", "Source")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-d2", "Target")))
+      ignore(@lib.add_dependency(storage, "bd-d1", "bd-d2", "blocks"))
+      ignore(@lib.add_dependency(storage, "bd-d1", "bd-d2", "related"))
+      // adding the same typed edge twice is a no-op
+      ignore(@lib.add_dependency(storage, "bd-d1", "bd-d2", "blocks"))
+
+      match @lib.get_dependencies(storage, "bd-d1") {
+        Ok(deps) => {
+          assert_eq(deps.length(), 2)
+          assert_eq(deps[0].depends_on, "bd-d2")
+          assert_eq(deps[0].type_, "blocks")
+          assert_eq(deps[1].type_, "related")
+        }
+        Err(_) => assert_eq(true, false)
+      }
+
+      // only the blocking edge keeps the source blocked
+      ignore(@lib.update_issue_status(storage, "bd-d2", "closed"))
+      ignore(@lib.add_dependency(storage, "bd-d2", "bd-d1", "related"))
+      assert_eq(is_blocked_or_fail(storage, "bd-d2"), false)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: search matches id, title and description" {
+  match open_fresh("/tmp/beads_test_search.db") {
+    Ok(storage) => {
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-srch1",
+            "Rename the widget",
+            2,
+            1,
+            Option::Some("mentions gadget in the body"),
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-srch2",
+            "Unrelated",
+            2,
+            2,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+
+      // title match, ASCII case-insensitive in either direction
+      assert_eq(search_ids(storage, "WIDGET"), "bd-srch1")
+      assert_eq(search_ids(storage, "rename"), "bd-srch1")
+      // description match
+      assert_eq(search_ids(storage, "gadget"), "bd-srch1")
+      // id match
+      assert_eq(search_ids(storage, "bd-srch2"), "bd-srch2")
+      // no match
+      assert_eq(search_ids(storage, "nothing here"), "")
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: search orders by priority and caps the result count" {
+  match open_fresh("/tmp/beads_test_search_order.db") {
+    Ok(storage) => {
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-so-low",
+            "match low",
+            3,
+            300,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-so-high",
+            "match high",
+            0,
+            100,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(
+          storage,
+          build_issue(
+            "bd-so-mid",
+            "match mid",
+            1,
+            200,
+            Option::None,
+            @lib.Status::Open,
+          ),
+        ),
+      )
+      assert_eq(search_ids(storage, "match"), "bd-so-high,bd-so-mid,bd-so-low")
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: search stops at the result limit" {
+  match open_fresh("/tmp/beads_test_search_limit.db") {
+    Ok(storage) => {
+      let mut index = 0
+      while index < 55 {
+        ignore(
+          @lib.insert_issue(
+            storage,
+            build_issue(
+              "bd-lim" + index.to_string(),
+              "match number " + index.to_string(),
+              2,
+              index,
+              Option::None,
+              @lib.Status::Open,
+            ),
+          ),
+        )
+        index += 1
+      }
+      // beads_rust's DEFAULT_SEARCH_LIMIT
+      assert_eq(search_count(storage, "match"), 50)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+test "storage: migrating a legacy database keeps its dependencies" {
+  let path = "/tmp/beads_test_migration.db"
+  write_legacy_database(path)
+
+  match @lib.open(path) {
+    Err(_) => assert_eq(true, false)
+    Ok(storage) => {
+      // the untyped edge survives as a `blocks` edge
+      match @lib.get_dependencies(storage, "bd-legacy2") {
+        Ok(deps) => {
+          assert_eq(deps.length(), 1)
+          assert_eq(deps[0].depends_on, "bd-legacy1")
+          assert_eq(deps[0].type_, "blocks")
+        }
+        Err(_) => assert_eq(true, false)
+      }
+      assert_eq(is_blocked_or_fail(storage, "bd-legacy2"), true)
+
+      // `type` is part of the key now, so a second type is allowed
+      ignore(
+        @lib.add_dependency(storage, "bd-legacy2", "bd-legacy1", "related"),
+      )
+      match @lib.get_dependencies(storage, "bd-legacy2") {
+        Ok(deps) => assert_eq(deps.length(), 2)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+  }
+
+  // reopening must not migrate twice
+  match @lib.open(path) {
+    Err(_) => assert_eq(true, false)
+    Ok(storage) => {
+      match @lib.get_dependencies(storage, "bd-legacy2") {
+        Ok(deps) => assert_eq(deps.length(), 2)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+  }
 }

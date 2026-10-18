@@ -41,7 +41,7 @@ let db_path : String = "./.beads/beads.db"
 
 ///|
 fn usage_text() -> String {
-  "bm - Local-first issue tracker for git repositories\n\nUsage:\n  bm [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title>          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id>             Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  search <query>          Search issues\n  comments <subcmd>       Manage comments\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nComments Subcommands:\n  comments add <issue> <body>   Add comment\n  comments list <issue>         List comments\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
+  "bm - Local-first issue tracker for git repositories\n\nUsage:\n  bm [options] <command> [args...]\n\nCommands:\n  init                    Initialize beads workspace\n  create <title> [--priority N] [--type TYPE]\n                          Create a new issue\n  list                    List issues\n  show <id>               Show issue details\n  update <id> [--title TITLE] [--priority N]\n                          Update an issue\n  close <id>              Close an issue\n  ready                   Show actionable issues\n  blocked                 Show blocked issues\n  search <query>          Search issues\n  comments <subcmd>       Manage comments\n  defer <id>              Defer an issue\n  dep <subcmd>            Manage dependencies\n  label <subcmd>          Manage labels\n  sync                    Sync database with JSONL export\n\nDependency Subcommands:\n  dep add <issue> <dep>   Add dependency\n  dep remove <issue> <dep> Remove dependency\n  dep list <issue>        List dependencies\n\nLabel Subcommands:\n  label add <issue> <label>     Add label\n  label remove <issue> <label>  Remove label\n  label list <issue>            List issue labels\n  label list-all                List all labels\n\nComments Subcommands:\n  comments add <issue> <body>   Add comment\n  comments list <issue>         List comments\n\nOptions:\n  -h, --help              Print this help message\n  -v, --version           Print version information\n"
 }
 
 ///|
@@ -126,11 +126,38 @@ fn handle_create_command(argv : Array[String]) -> Unit {
   }
 
   let title = argv[2]
+  let mut priority : Int32 = 2
+  let mut issue_type = @lib.IssueType::Other
 
-  // NOTE: --priority / --type are accepted but not applied yet.
+  let mut index = 3
+  while index < argv.length() {
+    let arg = argv[index]
+    if arg == "--priority" && index + 1 < argv.length() {
+      match @lib.parse_priority(argv[index + 1]) {
+        Result::Ok(value) => priority = value
+        Result::Err(e) => {
+          println("error: " + e)
+          return
+        }
+      }
+      index += 2
+    } else if arg == "--type" && index + 1 < argv.length() {
+      match @lib.parse_issue_type(argv[index + 1]) {
+        Result::Ok(value) => issue_type = value
+        Result::Err(e) => {
+          println("error: " + e)
+          return
+        }
+      }
+      index += 2
+    } else {
+      index += 1
+    }
+  }
+
   with_storage(fn(storage) {
     let id = @lib.generate_issue_id("bd")
-    let issue = @lib.make_issue(id, title)
+    let issue = @lib.make_issue(id, title, issue_type~, priority~)
     match @lib.insert_issue(storage, issue) {
       Result::Ok(_) => println("Created: " + id)
       Result::Err(e) => println("error: " + e)
@@ -197,8 +224,13 @@ fn handle_update_command(argv : Array[String]) -> Unit {
       new_title = Option::Some(argv[i + 1])
       i = i + 2
     } else if arg == "--priority" && i + 1 < argv.length() {
-      // TODO: parse int properly
-      new_priority = Option::Some(1)
+      match @lib.parse_priority(argv[i + 1]) {
+        Result::Ok(value) => new_priority = Option::Some(value)
+        Result::Err(e) => {
+          println("error: " + e)
+          return
+        }
+      }
       i = i + 2
     } else {
       i = i + 1
@@ -309,7 +341,13 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
           ) {
           let issue = argv[3]
           let depends_on = argv[4]
-          match @lib.add_dependency(storage, issue, depends_on) {
+          match
+            @lib.add_dependency(
+              storage,
+              issue,
+              depends_on,
+              @lib.default_dependency_type(),
+            ) {
             Result::Ok(_) =>
               println(
                 "Added dependency: " + issue + " depends on " + depends_on,
@@ -338,7 +376,7 @@ fn handle_dep_command(argv : Array[String]) -> Unit {
               } else {
                 println("Dependencies for " + issue + ":")
                 for dep in deps {
-                  println("  - " + dep)
+                  println("  - " + dep.depends_on + " (" + dep.type_ + ")")
                 }
               }
             Result::Err(e) => println("error: " + e)
@@ -426,24 +464,17 @@ fn handle_label_command(argv : Array[String]) -> Unit {
 ///|
 fn handle_blocked_command(_argv : Array[String]) -> Unit {
   with_storage(fn(storage) {
-    match @lib.list_issues(storage) {
+    match @lib.get_blocked_issues(storage) {
       Result::Ok(issues) => {
-        let mut blocked_count = 0
         println("Blocked issues:")
         println("")
 
-        for issue in issues {
-          match @lib.is_blocked(storage, issue.id) {
-            Result::Ok(true) => {
-              println(format_issue_line(issue))
-              blocked_count = blocked_count + 1
-            }
-            _ => ()
-          }
-        }
-
-        if blocked_count == 0 {
+        if issues.length() == 0 {
           println("  No blocked issues")
+        } else {
+          for issue in issues {
+            println(format_issue_line(issue))
+          }
         }
       }
       Result::Err(e) => println("error: " + e)

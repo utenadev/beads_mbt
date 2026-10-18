@@ -29,7 +29,11 @@ bm init
 ### Issue 作成
 ```bash
 bm create "Issue のタイトル"
+bm create "Issue のタイトル" --priority P1 --type bug
 ```
+`--priority` は `0`〜`4` または `P0`〜`P4`、`--type` は
+`bug` / `feature` / `task` / `documentation`（`docs` も可）/ `question` / `other`
+を受け付けます。
 
 ### Issue 一覧表示
 ```bash
@@ -44,6 +48,7 @@ bm show "bd-xxxxxx"
 ### Issue 更新
 ```bash
 bm update "bd-xxxxxx" --title "新しいタイトル"
+bm update "bd-xxxxxx" --priority 2
 ```
 
 ### Issue 完了
@@ -77,6 +82,9 @@ bm dep add "bd-xxxxxx" "bd-yyyyyy"
 bm dep remove "bd-xxxxxx" "bd-yyyyyy"
 bm dep list "bd-xxxxxx"
 ```
+`dep add` は `blocks` 依存を作成し、`dep list` は各依存を種類付きで表示します。
+`blocks` 依存の先が closed でない間はブロック扱いとなり、`parent-child`
+依存では子が親のブロック状態を継承します。
 
 ### ラベルの管理
 ```bash
@@ -165,6 +173,7 @@ MoonBit ツールチェーン `moon` 0.1.20261012（`moonc` v0.10.15）でビル
 ## 既知の問題
 1. **JSONL sync**: 未実装（`sync` はプレースホルダーメッセージを表示）
 2. **エラーメッセージ**: 英語のみ
+3. **検索の大文字小文字**: `bm search` が畳み込むのは ASCII のみで、アクセント付き文字はそのまま一致させる必要があります（beads_rust は非 ASCII も畳み込みます）
 
 ## 今後の作業
 1. **JSONL sync**: データベースから JSONL への同期

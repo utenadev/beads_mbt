@@ -8,13 +8,15 @@ import {
 // Values
 pub fn add_comment(BeadsStorage, String, String) -> Result[Int, String]
 
-pub fn add_dependency(BeadsStorage, String, String) -> Result[Unit, String]
+pub fn add_dependency(BeadsStorage, String, String, String) -> Result[Unit, String]
 
 pub fn add_label(BeadsStorage, String, String) -> Result[Unit, String]
 
 pub fn close(BeadsStorage) -> Unit
 
 pub fn current_timestamp() -> Int
+
+pub fn default_dependency_type() -> String
 
 pub fn defer_issue(BeadsStorage, String) -> Result[Unit, String]
 
@@ -26,11 +28,13 @@ pub fn get_all_labels(BeadsStorage) -> Result[Array[String], String]
 
 pub fn get_blocked_by(BeadsStorage, String) -> Result[Array[String], String]
 
+pub fn get_blocked_issues(BeadsStorage) -> Result[Array[Issue], String]
+
 pub fn get_comments(BeadsStorage, String) -> Result[Array[String], String]
 
 pub fn get_config(BeadsStorage, String) -> Result[String?, String]
 
-pub fn get_dependencies(BeadsStorage, String) -> Result[Array[String], String]
+pub fn get_dependencies(BeadsStorage, String) -> Result[Array[Dependency], String]
 
 pub fn get_issue_by_id(BeadsStorage, String) -> Result[Issue?, String]
 
@@ -44,13 +48,19 @@ pub fn insert_issue(BeadsStorage, Issue) -> Result[Unit, String]
 
 pub fn is_blocked(BeadsStorage, String) -> Result[Bool, String]
 
+pub fn is_blocking_dependency_type(String) -> Bool
+
 pub fn issue_type_to_string(IssueType) -> String
 
 pub fn list_issues(BeadsStorage) -> Result[Array[Issue], String]
 
-pub fn make_issue(String, String) -> Issue
+pub fn make_issue(String, String, issue_type? : IssueType, priority? : Int) -> Issue
 
 pub fn open(String) -> Result[BeadsStorage, String]
+
+pub fn parse_issue_type(String) -> Result[IssueType, String]
+
+pub fn parse_priority(String) -> Result[Int, String]
 
 pub fn remove_dependency(BeadsStorage, String, String) -> Result[Unit, String]
 
@@ -79,7 +89,13 @@ pub struct BeadsStorage {
   conn : @sqlite3.Connection
 }
 
-pub struct Issue {
+pub struct Dependency {
+  issue_id : String
+  depends_on : String
+  type_ : String
+}
+
+pub(all) struct Issue {
   id : String
   title : String
   type_ : IssueType
@@ -93,7 +109,7 @@ pub struct Issue {
   is_ephemeral : Bool
 }
 
-pub enum IssueType {
+pub(all) enum IssueType {
   Bug
   Feature
   Task
@@ -102,7 +118,7 @@ pub enum IssueType {
   Other
 }
 
-pub enum Status {
+pub(all) enum Status {
   Open
   InProgress
   Closed
@@ -110,6 +126,8 @@ pub enum Status {
 }
 
 // Type aliases
+pub type DependencyType = String
+
 pub type Priority = Int
 
 // Traits
