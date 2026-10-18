@@ -2,3 +2,5 @@
 _build/
 .mooncakes/
 .moonagent/.qwen/
+
+repomix-beads_rust_*.md
