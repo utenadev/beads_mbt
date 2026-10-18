@@ -16,7 +16,7 @@ pub fn generate_issue_id(prefix : String) -> String {
 
 ///|
 /// Get current timestamp (seconds since epoch)
-pub fn current_timestamp() -> Int {
+pub fn current_timestamp() -> Int32 {
   // TODO: Use system time when available
   0
 }

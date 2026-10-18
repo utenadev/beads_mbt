@@ -11,7 +11,7 @@ pub enum Status {
 
 ///|
 /// Issue priority (0-4, where 0 is critical)
-pub type Priority = Int
+pub type Priority = Int32
 
 ///|
 /// Issue type
@@ -35,8 +35,8 @@ pub struct Issue {
   description : String?
   assignee : String?
   owner : String?
-  created_at : Int
-  updated_at : Int
+  created_at : Int32
+  updated_at : Int32
   is_ephemeral : Bool
 }
 

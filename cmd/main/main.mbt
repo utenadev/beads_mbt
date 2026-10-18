@@ -43,7 +43,6 @@ fn usage_text() -> String {
 ///|
 fn handle_init_command(argv : Array[String]) -> Unit {
   let mut prefix : String? = None
-  let mut force = false
 
   let mut index = 2
   while index < argv.length() {
@@ -57,7 +56,6 @@ fn handle_init_command(argv : Array[String]) -> Unit {
       prefix = Some(argv[index + 1])
       index += 2
     } else if arg == "--force" {
-      force = true
       index += 1
     } else {
       index += 1
@@ -92,17 +90,14 @@ fn handle_create_command(argv : Array[String]) -> Unit {
   }
 
   let title = argv[2]
-  let mut priority = 2
-  let mut type_ = "task"
 
+  // NOTE: --priority / --type are accepted but not applied yet.
   let mut i = 3
   while i < argv.length() {
     let arg = argv[i]
     if arg == "--priority" && i + 1 < argv.length() {
-      priority = 1 // TODO: parse int
       i = i + 2
     } else if arg == "--type" && i + 1 < argv.length() {
-      type_ = argv[i + 1]
       i = i + 2
     } else {
       i = i + 1
@@ -125,7 +120,7 @@ fn handle_create_command(argv : Array[String]) -> Unit {
 }
 
 ///|
-fn handle_list_command(argv : Array[String]) -> Unit {
+fn handle_list_command(_argv : Array[String]) -> Unit {
   let db_path = "./.beads/beads.db"
   match @lib.open(db_path) {
     Result::Ok(storage) => {
@@ -189,7 +184,7 @@ fn handle_update_command(argv : Array[String]) -> Unit {
   let db_path = "./.beads/beads.db"
 
   let mut new_title : String? = Option::None
-  let mut new_priority : Int? = Option::None
+  let mut new_priority : Int32? = Option::None
 
   let mut i = 3
   while i < argv.length() {
@@ -296,7 +291,7 @@ fn handle_ready_command() -> Unit {
 }
 
 ///|
-fn handle_sync_command(argv : Array[String]) -> Unit {
+fn handle_sync_command(_argv : Array[String]) -> Unit {
   println("sync command: not yet implemented")
 }
 
@@ -478,7 +473,7 @@ fn handle_label_command(argv : Array[String]) -> Unit {
 }
 
 ///|
-fn handle_blocked_command(argv : Array[String]) -> Unit {
+fn handle_blocked_command(_argv : Array[String]) -> Unit {
   let db_path = "./.beads/beads.db"
 
   match @lib.open(db_path) {

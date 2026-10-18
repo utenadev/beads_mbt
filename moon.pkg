@@ -1,3 +1,5 @@
 import {
   "utenadev/beads_mbt/lib",
-}
+} for "test"
+
+supported_targets = "native"

@@ -1,7 +1,8 @@
 import {
   "utenadev/beads_mbt/lib",
   "moonbitlang/core/env",
-  "moonbitlang/x/sys",
 }
 
 pkgtype(kind: "executable")
+
+supported_targets = "native"

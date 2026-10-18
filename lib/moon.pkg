@@ -3,9 +3,7 @@ import {
   "moonbitlang/x/fs",
 }
 
-import {
-  "moonbit-community/sqlite3",
-} for "test"
+supported_targets = "native"
 
 options(
   "export": [
