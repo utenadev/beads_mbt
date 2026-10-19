@@ -31,7 +31,16 @@ jobs:
       run: moon update
 
     - name: Run local CI checks (fmt, info, check, test)
-      run: just ci
+      run: |
+        just fmt-check
+        moon info
+        echo "=== generated mbti status ==="
+        git status --porcelain -- ':(glob)**/*.generated.mbti'
+        echo "=== generated mbti diff ==="
+        git diff -- ':(glob)**/*.generated.mbti'
+        echo "=== end diff ==="
+        just check
+        just test
 
   build:
     runs-on: ubuntu-latest
