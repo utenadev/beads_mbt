@@ -282,7 +282,7 @@ Built and tested with MoonBit toolchain `moon` 0.1.20261012 (`moonc` v0.10.15).
 
 ## Known Limitations
 1. **JSONL sync**: Not implemented; `bm sync` fails with exit code `1` instead of reporting success
-2. **Timestamps**: `created_at` and `updated_at` are always `0` because `current_timestamp()` is not implemented yet, so JSON output reports `0` for every issue and "most recently created first" falls back to the id order
+2. **Close metadata**: `closed_at` and `close_reason` are never written, so `bm close` leaves `closed_at` null in JSON output
 3. **Error messages**: English only
 4. **Search case folding**: `bm search` folds ASCII case only, so accented text has to match verbatim (beads_rust folds non-ASCII case too)
 5. **TOON output**: `--format` accepts `text` and `json` only

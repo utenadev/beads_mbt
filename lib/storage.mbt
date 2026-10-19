@@ -1184,7 +1184,7 @@ pub fn add_comment(
   issue : String,
   body : String,
 ) -> Result[Int32, String] {
-  let created_at = 0 // TODO: Use actual timestamp
+  let created_at = current_timestamp()
   let result = exec_write(
     storage,
     "INSERT INTO comments (issue_id, body, created_at) VALUES (?, ?, ?);",

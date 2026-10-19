@@ -271,7 +271,7 @@ MoonBit ツールチェーン `moon` 0.1.20261012（`moonc` v0.10.15）でビル
 
 ## 既知の問題
 1. **JSONL sync**: 未実装（`bm sync` は成功を報告せず終了コード `1` で失敗します）
-2. **タイムスタンプ**: `current_timestamp()` が未実装のため `created_at` / `updated_at` は常に `0` です。JSON 出力でも全 Issue が `0` となり、「新しい順」は id 順にフォールバックします
+2. **クローズ情報**: `closed_at` / `close_reason` は書き込まれないため、`bm close` 後も JSON 出力の `closed_at` は `null` のままです
 3. **エラーメッセージ**: 英語のみ
 4. **検索の大文字小文字**: `bm search` が畳み込むのは ASCII のみで、アクセント付き文字はそのまま一致させる必要があります（beads_rust は非 ASCII も畳み込みます）
 5. **TOON 出力**: `--format` は `text` と `json` のみ受け付けます

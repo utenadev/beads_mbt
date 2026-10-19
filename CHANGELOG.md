@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `created_at` / `updated_at` were always `0`: `current_timestamp()` now reads the wall clock through `@env.now()`, so `bm create` stamps issues (and `bm comments add` stamps comments) with real Unix seconds and `bm list` orders by the actual creation time
+
 ## [0.2.0] - 2026-10-19
 
 ### Added
