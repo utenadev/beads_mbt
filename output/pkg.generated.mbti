@@ -16,17 +16,17 @@ pub fn default_fields() -> Array[String]
 
 pub fn error_envelope(CliError) -> Json
 
-pub fn exit_code(ErrorKind) -> Int
+pub fn exit_code(ErrorKind) -> Int32
 
 pub fn issue_json(@lib.Issue, Array[String], @lib.IssueFacts?) -> Json
 
 pub fn needs_issue_facts(Array[String]) -> Bool
 
-pub fn page_json(String, Array[Json], Int, Int, Int, Bool) -> Json
+pub fn page_json(String, Array[Json], Int32, Int32, Int32, Bool) -> Json
 
 pub fn parse_fields(String) -> Result[Array[String], CliError]
 
-pub fn search_json(Array[Json], Int, Int, Int, Bool) -> Json
+pub fn search_json(Array[Json], Int32, Int32, Int32, Bool) -> Json
 
 pub fn storage_error(String) -> CliError
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Upgraded the MoonBit toolchain to `moon` 0.1.20261016 (`moonc` v0.10.16): the new `moon info` prints generated `.mbti` types as `Int32` instead of `Int`, so `lib/pkg.generated.mbti` and `output/pkg.generated.mbti` were regenerated
+
 ### Fixed
 - `created_at` / `updated_at` were always `0`: `current_timestamp()` now reads the wall clock through `@env.now()`, so `bm create` stamps issues (and `bm comments add` stamps comments) with real Unix seconds and `bm list` orders by the actual creation time
 

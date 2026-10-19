@@ -278,7 +278,7 @@ import {
 }
 ```
 
-Built and tested with MoonBit toolchain `moon` 0.1.20261012 (`moonc` v0.10.15).
+Built and tested with MoonBit toolchain `moon` 0.1.20261016 (`moonc` v0.10.16). CI installs the latest toolchain release, so `.mbti` files may need to be regenerated when a new one lands.
 
 ## Known Limitations
 1. **JSONL sync**: Not implemented; `bm sync` fails with exit code `1` instead of reporting success
