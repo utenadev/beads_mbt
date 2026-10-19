@@ -59,6 +59,7 @@ pub fn make_issue(
   issue_type~ : IssueType = IssueType::Other,
   priority~ : Priority = 2,
 ) -> Issue {
+  let timestamp = current_timestamp()
   Issue::{
     id,
     title,
@@ -70,8 +71,8 @@ pub fn make_issue(
     owner: Option::None,
     acceptance_criteria: Option::None,
     prerequisites: Option::None,
-    created_at: 0,
-    updated_at: 0,
+    created_at: timestamp,
+    updated_at: timestamp,
     is_ephemeral: false,
   }
 }

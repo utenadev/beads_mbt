@@ -153,6 +153,42 @@ test "storage: insert and get issue" {
 }
 
 ///|
+test "storage: created issues carry Unix-second timestamps" {
+  match open_fresh("/tmp/beads_test_timestamps.db") {
+    Ok(storage) => {
+      let issue = @lib.make_issue("bd-timestamp1", "Timestamped issue")
+      assert_eq(issue.created_at, issue.updated_at)
+      assert_eq(issue.created_at > 0, true)
+      match @lib.insert_issue(storage, issue) {
+        Ok(_) => ()
+        Err(_) => assert_eq(true, false)
+      }
+      // The row keeps what `make_issue` stamped, and an update moves it on.
+      match @lib.get_issue_by_id(storage, "bd-timestamp1") {
+        Ok(Some(stored)) => {
+          assert_eq(stored.created_at, issue.created_at)
+          assert_eq(stored.updated_at, issue.updated_at)
+        }
+        _ => assert_eq(true, false)
+      }
+      match @lib.update_issue_title(storage, "bd-timestamp1", "Renamed") {
+        Ok(_) => ()
+        Err(_) => assert_eq(true, false)
+      }
+      match @lib.get_issue_by_id(storage, "bd-timestamp1") {
+        Ok(Some(stored)) => {
+          assert_eq(stored.created_at, issue.created_at)
+          assert_eq(stored.updated_at >= stored.created_at, true)
+        }
+        _ => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
 test "storage: list_issues orders by recency and breaks ties by id" {
   match open_fresh("/tmp/beads_test_list.db") {
     Ok(storage) => {
@@ -363,9 +399,13 @@ test "util: generate_short_id returns 6 chars" {
 }
 
 ///|
-test "util: current_timestamp returns non-negative" {
+test "util: current_timestamp is Unix seconds on the wall clock" {
+  let before = (@env.now() / 1000UL).to_int()
   let ts = @lib.current_timestamp()
-  assert_eq(ts >= 0, true)
+  let after = (@env.now() / 1000UL).to_int()
+  // Seconds, not milliseconds: a millisecond reading would be ~1000x larger.
+  assert_eq(ts >= before, true)
+  assert_eq(ts <= after, true)
 }
 
 ///|
