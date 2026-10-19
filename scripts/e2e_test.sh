@@ -10,7 +10,19 @@
 set -e
 
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-BM_BIN="$PROJECT_DIR/_build/native/debug/build/cmd/bm/bm.exe"
+# Local runs exercise the debug build; CI sets BM_PROFILE=release so the tests
+# run against the same binary that is uploaded as an artifact.
+BM_PROFILE="${BM_PROFILE:-debug}"
+BM_BUILD_ARGS=""
+case "$BM_PROFILE" in
+  debug) ;;
+  release) BM_BUILD_ARGS="--release" ;;
+  *)
+    echo "unknown BM_PROFILE: $BM_PROFILE (expected debug or release)" >&2
+    exit 2
+    ;;
+esac
+BM_BIN="$PROJECT_DIR/_build/native/$BM_PROFILE/build/cmd/bm/bm.exe"
 
 # Colors for output
 RED='\033[0;31m'
@@ -56,7 +68,7 @@ cleanup() {
 # Setup test environment
 setup() {
     log_info "Building binary and setting up test workspace..."
-    ( cd "$PROJECT_DIR" && moon build cmd/bm --target native )
+    ( cd "$PROJECT_DIR" && moon build cmd/bm --target native $BM_BUILD_ARGS )
     WORKDIR="$(mktemp -d)"
     BEADS_DIR="$WORKDIR/.beads"
 }

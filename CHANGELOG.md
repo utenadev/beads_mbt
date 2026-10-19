@@ -7,7 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-19
+
 ### Changed
+- CI uploads release builds instead of debug builds, so the Linux artifact drops from 5.4 MB to 1.8 MB (about 0.9 MB zipped) and matches the binary the release publishes; `BM_PROFILE=release bash scripts/e2e_test.sh` runs the E2E suite against it
 - Upgraded the MoonBit toolchain to `moon` 0.1.20261016 (`moonc` v0.10.16): the new `moon info` prints generated `.mbti` types as `Int32` instead of `Int`, so `lib/pkg.generated.mbti` and `output/pkg.generated.mbti` were regenerated
 
 ### Fixed

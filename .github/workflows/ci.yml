@@ -58,14 +58,13 @@ jobs:
     - name: Verify MoonBit installation
       run: moon version --all
     
-    - name: Build native binary
-      run: moon build cmd/bm --target native
-    
     - name: Run E2E tests
+      env:
+        BM_PROFILE: release
       run: bash scripts/e2e_test.sh
     
     - name: Stage binary as bm
-      run: cp _build/native/debug/build/cmd/bm/bm.exe bm
+      run: cp _build/native/release/build/cmd/bm/bm.exe bm
 
     - name: Upload binary
       uses: actions/upload-artifact@v4
@@ -93,11 +92,11 @@ jobs:
     - name: Update MoonBit registry
       run: moon update
     
-    - name: Build native binary
-      run: moon build cmd/bm --target native
+    - name: Build native binary (release)
+      run: moon build cmd/bm --target native --release
     
     - name: Stage binary as bm
-      run: cp _build/native/debug/build/cmd/bm/bm.exe bm
+      run: cp _build/native/release/build/cmd/bm/bm.exe bm
 
     - name: Upload binary
       uses: actions/upload-artifact@v4
@@ -125,13 +124,13 @@ jobs:
     - name: Update MoonBit registry
       run: moon update
     
-    - name: Build native binary
-      run: moon build cmd/bm --target native
+    - name: Build native binary (release)
+      run: moon build cmd/bm --target native --release
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: beads-mbt-windows
         # Windows keeps the `.exe` suffix
-        path: _build/native/debug/build/cmd/bm/bm.exe
+        path: _build/native/release/build/cmd/bm/bm.exe
         if-no-files-found: error
