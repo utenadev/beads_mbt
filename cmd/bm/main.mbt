@@ -68,7 +68,7 @@ fn run(argv : Array[String]) -> Int32 {
       0
     }
     "--version" | "-v" => {
-      println("bm 0.2.0 (moonbit)")
+      println("bm 0.2.1 (moonbit)")
       0
     }
     command =>
