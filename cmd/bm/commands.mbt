@@ -99,7 +99,7 @@ fn handle_create_command(ctx : Context) -> Int32 {
     return fail(
       ctx,
       required_field(
-        "title is required", "bm create <title> [--priority N] [--type TYPE] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF]",
+        "title is required", "bm create <title> [--priority N] [--type TYPE] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF] [--parent ID]",
       ),
     )
   }
@@ -111,6 +111,7 @@ fn handle_create_command(ctx : Context) -> Int32 {
   let mut due_date : Int32? = Option::None
   let mut defer_until : Int32? = Option::None
   let mut external_ref : String? = Option::None
+  let mut parent : String? = Option::None
 
   let mut index = 3
   while index < ctx.args.length() {
@@ -120,7 +121,8 @@ fn handle_create_command(ctx : Context) -> Int32 {
       arg == "--estimate" ||
       arg == "--due" ||
       arg == "--defer" ||
-      arg == "--external-ref" {
+      arg == "--external-ref" ||
+      arg == "--parent" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
       }
@@ -152,6 +154,8 @@ fn handle_create_command(ctx : Context) -> Int32 {
           Result::Ok(parsed) => defer_until = parsed
           Result::Err(e) => return fail(ctx, e)
         }
+      } else if arg == "--parent" {
+        parent = ref_from_flag(value)
       } else {
         external_ref = ref_from_flag(value)
       }
@@ -178,12 +182,16 @@ fn handle_create_command(ctx : Context) -> Int32 {
     match @lib.insert_issue(storage, issue) {
       Result::Err(e) => Result::Err(@output.storage_error(e))
       Result::Ok(_) =>
-        match ctx.mode {
-          OutputMode::Text => {
-            println("Created: " + id)
-            Result::Ok(())
-          }
-          OutputMode::Json => print_stored_issue(storage, id)
+        match @lib.set_parent(storage, id, parent) {
+          Result::Err(e) => Result::Err(@output.storage_error(e))
+          Result::Ok(_) =>
+            match ctx.mode {
+              OutputMode::Text => {
+                println("Created: " + id)
+                Result::Ok(())
+              }
+              OutputMode::Json => print_stored_issue(storage, id)
+            }
         }
     }
   })
@@ -289,12 +297,9 @@ fn handle_show_command(ctx : Context) -> Int32 {
 
     match ctx.mode {
       OutputMode::Json => {
-        let rows : Array[Json] = []
-        for issue in issues {
-          Array::push(
-            rows,
-            @output.issue_json(issue, @output.default_fields(), None),
-          )
+        let rows = match issue_rows(storage, issues, @output.default_fields()) {
+          Result::Ok(rows) => rows
+          Result::Err(error) => return Result::Err(error)
         }
         emit_json(Json::array(rows))
       }
@@ -305,7 +310,11 @@ fn handle_show_command(ctx : Context) -> Int32 {
             println("")
           }
           first = false
-          print_issue_detail(issue)
+          let parent = match @lib.get_parent_id(storage, issue.id) {
+            Result::Ok(parent) => parent
+            Result::Err(e) => return Result::Err(@output.storage_error(e))
+          }
+          print_issue_detail(issue, parent)
         }
       }
     }
@@ -319,7 +328,7 @@ fn handle_update_command(ctx : Context) -> Int32 {
     return fail(
       ctx,
       required_field(
-        "issue ID is required", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF]",
+        "issue ID is required", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF] [--parent ID]",
       ),
     )
   }
@@ -335,6 +344,8 @@ fn handle_update_command(ctx : Context) -> Int32 {
   let mut defer_until_given = false
   let mut new_external_ref : String? = Option::None
   let mut external_ref_given = false
+  let mut new_parent : String? = Option::None
+  let mut parent_given = false
 
   let mut index = 3
   while index < ctx.args.length() {
@@ -344,7 +355,8 @@ fn handle_update_command(ctx : Context) -> Int32 {
       arg == "--estimate" ||
       arg == "--due" ||
       arg == "--defer" ||
-      arg == "--external-ref" {
+      arg == "--external-ref" ||
+      arg == "--parent" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
       }
@@ -381,6 +393,9 @@ fn handle_update_command(ctx : Context) -> Int32 {
           }
           Result::Err(e) => return fail(ctx, e)
         }
+      } else if arg == "--parent" {
+        new_parent = ref_from_flag(value)
+        parent_given = true
       } else {
         new_external_ref = ref_from_flag(value)
         external_ref_given = true
@@ -397,12 +412,13 @@ fn handle_update_command(ctx : Context) -> Int32 {
     !due_date_given &&
     !defer_until_given &&
     !external_ref_given &&
+    !parent_given &&
     new_title is None &&
     new_priority is None {
     return fail(
       ctx,
       required_field(
-        "no updates specified", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF]",
+        "no updates specified", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF] [--parent ID]",
       ),
     )
   }
@@ -461,6 +477,17 @@ fn handle_update_command(ctx : Context) -> Int32 {
         Result::Ok(_) =>
           match ctx.mode {
             OutputMode::Text => println("Updated defer date")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if parent_given {
+      match @lib.set_parent(storage, id, new_parent) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated parent")
             OutputMode::Json => ()
           }
         Result::Err(e) => return Result::Err(@output.storage_error(e))

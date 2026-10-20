@@ -46,6 +46,8 @@ pub fn get_issue_by_id(BeadsStorage, String) -> Result[Issue?, String]
 
 pub fn get_labels(BeadsStorage, String) -> Result[Array[String], String]
 
+pub fn get_parent_id(BeadsStorage, String) -> Result[String?, String]
+
 pub fn get_ready_issues(BeadsStorage, include_deferred? : Bool) -> Result[Array[Issue], String]
 
 pub fn init_workspace(String, String?) -> Result[String, String]
@@ -85,6 +87,8 @@ pub let search_limit : Int32
 pub fn search_matching_issues(BeadsStorage, String) -> Result[Array[Issue], String]
 
 pub fn set_config(BeadsStorage, String, String) -> Result[Unit, String]
+
+pub fn set_parent(BeadsStorage, String, String?) -> Result[Unit, String]
 
 pub fn status_to_string(Status) -> String
 
@@ -158,6 +162,7 @@ pub(all) struct IssueFacts {
   labels : Array[String]
   dependency_count : Int32
   dependent_count : Int32
+  parent_id : String?
 }
 
 pub(all) enum IssueType {

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `defer_until`, the `bm ready` time gate: `bm create --defer DATE` / `bm update --defer DATE` (an empty value clears it), `bm defer <id> --until DATE`, `bm undefer <id>`, a `Deferred until:` line in `bm show`, and the `defer_until` JSON field
 - `bm ready` hides issues whose `defer_until` is still in the future, even when their status is `open`; `bm ready --include-deferred` shows the gated backlog and deferred issues
 - `comments.author` (schema version 3, default `bm`) and `bm comments add --author NAME`
+- `--parent ID` on `bm create` / `bm update`, which writes a `parent-child` dependency edge (an empty value removes it on update); `bm show` prints `Parent:`, JSON exposes `parent_id`, and a child inherits its parent's blockers
 
 ### Changed
 - `bm comments list --json` writes one object per comment (`id`, `issue_id`, `author`, `text`, `created_at`) instead of an array of strings, matching beads_rust; `comments add --json` reports the new comment's id, author, and text

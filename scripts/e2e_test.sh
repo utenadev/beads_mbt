@@ -371,6 +371,50 @@ test_create_flags_reject_invalid() {
     test_pass "create rejects invalid --priority and --type"
 }
 
+test_parent_flag() {
+    test_start "Test: create/update --parent"
+
+    parent=$(run_cmd create "Parent work" | sed 's/Created: //')
+    child=$(run_cmd create "Child work" --parent "$parent" | sed 's/Created: //')
+    if [ -z "$child" ]; then
+        test_fail "create --parent should return an issue id"
+        return
+    fi
+
+    if ! run_cmd show "$child" | grep -q "Parent: $parent"; then
+        test_fail "show should print the parent"
+        run_cmd show "$child"
+        return
+    fi
+    json=$(run_cmd_stdout show "$child" --json)
+    if ! echo "$json" | grep -q "\"parent_id\":\"$parent\""; then
+        test_fail "show --json should write parent_id"
+        echo "Output: $json"
+        return
+    fi
+
+    # a blocked parent keeps its child out of ready
+    blocker=$(run_cmd create "Parent blocker" | sed 's/Created: //')
+    run_cmd dep add "$parent" "$blocker" > /dev/null
+    if ! run_cmd blocked | grep -q "$child"; then
+        test_fail "the child should inherit the parent's blocker"
+        return
+    fi
+
+    # an empty --parent clears the edge and the inherited block
+    run_cmd update "$child" --parent "" > /dev/null
+    if run_cmd show "$child" | grep -q "Parent:"; then
+        test_fail "an empty --parent should clear the parent"
+        return
+    fi
+    if run_cmd blocked | grep -q "$child"; then
+        test_fail "clearing the parent should drop the inherited block"
+        return
+    fi
+
+    test_pass "parent edges are created, shown, inherited, and cleared"
+}
+
 test_scheduling_flags() {
     test_start "Test: create/update --estimate, --due, --external-ref"
 
@@ -816,6 +860,7 @@ main() {
     test_create_flags_reject_invalid
     test_scheduling_flags
     test_scheduling_flags_reject_invalid
+    test_parent_flag
     test_ready_skips_blocked
     test_search
     test_json_list
