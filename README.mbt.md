@@ -55,9 +55,13 @@ bm init
 ```bash
 bm create "Issue title"
 bm create "Issue title" --priority P1 --type bug
+bm create "Issue title" --estimate 30 --due +2d --external-ref gh-123
 ```
 `--priority` accepts `0`-`4` or `P0`-`P4`, `--type` accepts
 `bug`, `feature`, `task`, `documentation` (or `docs`), `question`, `other`.
+`--estimate` is a time estimate in minutes, `--external-ref` is an opaque
+reference such as a GitHub issue number, and `--due` takes `YYYY-MM-DD`
+(09:00 UTC), `YYYY-MM-DDTHH:MM:SSZ`, `+Nd`/`+Nw`/`+Nh`, or `tomorrow`.
 
 ### List Issues
 ```bash
@@ -77,6 +81,8 @@ exit code `3`, so a partly printed list never looks complete.
 ```bash
 bm update "bd-xxxxxx" --title "New title"
 bm update "bd-xxxxxx" --priority 2
+bm update "bd-xxxxxx" --estimate 45 --due 2026-11-01 --external-ref gh-123
+bm update "bd-xxxxxx" --due ""      # an empty value clears the field
 ```
 
 ### Close Issue
@@ -204,7 +210,8 @@ bm list --json --fields id,title,labels,dependency_count,dependent_count
 
 Supported names: `id`, `title`, `description`, `status`, `priority`,
 `issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
-`created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`.
+`external_ref`, `estimated_minutes`, `due_at`, `created_at`, `updated_at`,
+`labels`, `dependency_count`, `dependent_count`.
 `labels` and the dependency counts need extra queries, so they are only loaded
 when a projection asks for them. `bm ready --brief` selects
 `id,title,status,priority,issue_type,created_at,updated_at`, which is what the
@@ -286,6 +293,8 @@ Built and tested with MoonBit toolchain `moon` 0.1.20261016 (`moonc` v0.10.16). 
 3. **Error messages**: English only
 4. **Search case folding**: `bm search` folds ASCII case only, so accented text has to match verbatim (beads_rust folds non-ASCII case too)
 5. **TOON output**: `--format` accepts `text` and `json` only
+6. **Bare due dates**: `YYYY-MM-DD` means 09:00 UTC; beads_rust resolves it to
+   09:00 local time, which needs a time-zone database bm does not ship
 
 ## Future Work
 1. **JSONL sync**: Database to JSONL synchronization

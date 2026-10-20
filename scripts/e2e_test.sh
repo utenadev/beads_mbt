@@ -285,6 +285,99 @@ test_create_flags_reject_invalid() {
     test_pass "create rejects invalid --priority and --type"
 }
 
+test_scheduling_flags() {
+    test_start "Test: create/update --estimate, --due, --external-ref"
+
+    issue=$(run_cmd create "Scheduled work" --estimate 90 --due 2026-09-11 --external-ref gh-123 | sed 's/Created: //')
+    if [ -z "$issue" ]; then
+        test_fail "create with scheduling flags should return an issue id"
+        return
+    fi
+
+    detail=$(run_cmd show "$issue")
+    if ! echo "$detail" | grep -q "External Ref: gh-123"; then
+        test_fail "show should print the external reference"
+        echo "Output: $detail"
+        return
+    fi
+    if ! echo "$detail" | grep -q "Estimate: 90m"; then
+        test_fail "show should print the estimate"
+        echo "Output: $detail"
+        return
+    fi
+    if ! echo "$detail" | grep -q "Due: 2026-09-11"; then
+        test_fail "show should print the due date"
+        echo "Output: $detail"
+        return
+    fi
+
+    json=$(run_cmd_stdout show "$issue" --json)
+    if ! echo "$json" | grep -q '"external_ref":"gh-123"'; then
+        test_fail "show --json should write external_ref"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"estimated_minutes":90'; then
+        test_fail "show --json should write estimated_minutes"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"due_at":1789117200'; then
+        test_fail "show --json should write due_at"
+        echo "Output: $json"
+        return
+    fi
+
+    # update replaces the values, and an empty value clears the field
+    run_cmd update "$issue" --estimate 30 --due +2d --external-ref gh-456 > /dev/null
+    json=$(run_cmd_stdout show "$issue" --json)
+    if ! echo "$json" | grep -q '"estimated_minutes":30'; then
+        test_fail "update should replace the estimate"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"external_ref":"gh-456"'; then
+        test_fail "update should replace the external reference"
+        echo "Output: $json"
+        return
+    fi
+
+    run_cmd update "$issue" --estimate "" --due "" --external-ref "" > /dev/null
+    json=$(run_cmd_stdout show "$issue" --json)
+    if ! echo "$json" | grep -q '"external_ref":null'; then
+        test_fail "an empty --external-ref should clear the field"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"due_at":null'; then
+        test_fail "an empty --due should clear the field"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"estimated_minutes":null'; then
+        test_fail "an empty --estimate should clear the field"
+        echo "Output: $json"
+        return
+    fi
+
+    test_pass "scheduling flags round-trip through create, show, and update"
+}
+
+test_scheduling_flags_reject_invalid() {
+    test_start "Test: scheduling flags reject invalid values"
+
+    if ! run_cmd create "Bad date" --due nonsense | grep -q "invalid date"; then
+        test_fail "create should reject --due nonsense"
+        return
+    fi
+    if ! run_cmd create "Bad estimate" --estimate abc | grep -q "invalid number"; then
+        test_fail "create should reject --estimate abc"
+        return
+    fi
+
+    test_pass "create rejects invalid --due and --estimate values"
+}
+
 test_ready_skips_blocked() {
     test_start "Test: ready skips blocked issues"
 
@@ -633,6 +726,8 @@ main() {
     test_defer
     test_create_flags
     test_create_flags_reject_invalid
+    test_scheduling_flags
+    test_scheduling_flags_reject_invalid
     test_ready_skips_blocked
     test_search
     test_json_list

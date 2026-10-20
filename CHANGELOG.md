@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `external_ref`, `estimate` (minutes), and `due_date` (Unix seconds) on issues: `bm create --external-ref REF --estimate MINUTES --due DATE`, the same flags on `bm update` (an empty value clears the field), `bm show` lines, and the `external_ref` / `estimated_minutes` / `due_at` JSON fields (beads_rust names)
+- Dates accept `YYYY-MM-DD` (09:00 UTC), `YYYY-MM-DDTHH:MM:SSZ`, `+Nd` / `+Nw` / `+Nh`, and `tomorrow`; `format_date` prints the same day back in `bm show`
+- The schema migration to version 2 now also adds `external_ref`, `estimate`, and `due_date` when a version 1 database lacks them
+
 ## [0.2.1] - 2026-10-19
 
 ### Changed

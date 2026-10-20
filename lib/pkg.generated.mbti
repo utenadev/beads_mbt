@@ -22,6 +22,8 @@ pub fn defer_issue(BeadsStorage, String) -> Result[Unit, String]
 
 pub fn exclude_issues_with_labels(BeadsStorage, Array[Issue], Array[String]) -> Result[Array[Issue], String]
 
+pub fn format_date(Int32) -> String
+
 pub fn generate_issue_id(String) -> String
 
 pub fn generate_short_id() -> String
@@ -60,11 +62,15 @@ pub fn list_issues(BeadsStorage) -> Result[Array[Issue], String]
 
 pub fn load_issue_facts(BeadsStorage, Array[Issue]) -> Result[Map[String, IssueFacts], String]
 
-pub fn make_issue(String, String, issue_type? : IssueType, priority? : Int32) -> Issue
+pub fn make_issue(String, String, issue_type? : IssueType, priority? : Int32, external_ref? : String?, estimate? : Int32?, due_date? : Int32?) -> Issue
 
 pub fn open(String) -> Result[BeadsStorage, String]
 
+pub fn parse_date_to_timestamp(String) -> Result[Int32, String]
+
 pub fn parse_issue_type(String) -> Result[IssueType, String]
+
+pub fn parse_non_negative_int(String) -> Result[Int32, String]
 
 pub fn parse_priority(String) -> Result[Int32, String]
 
@@ -85,6 +91,12 @@ pub fn status_to_string(Status) -> String
 pub fn string_to_issue_type(String) -> IssueType
 
 pub fn string_to_status(String) -> Status
+
+pub fn update_issue_due_date(BeadsStorage, String, Int32?) -> Result[Unit, String]
+
+pub fn update_issue_estimate(BeadsStorage, String, Int32?) -> Result[Unit, String]
+
+pub fn update_issue_external_ref(BeadsStorage, String, String?) -> Result[Unit, String]
 
 pub fn update_issue_priority(BeadsStorage, String, Int32) -> Result[Unit, String]
 
@@ -121,6 +133,9 @@ pub(all) struct Issue {
   owner : String?
   acceptance_criteria : String?
   prerequisites : String?
+  external_ref : String?
+  estimate : Int32?
+  due_date : Int32?
   created_at : Int32
   updated_at : Int32
   is_ephemeral : Bool

@@ -23,6 +23,33 @@ fn col_int(stmt : @sqlite3.Statement, index : Int32) -> Int32 {
 }
 
 ///|
+/// Read a column as a dynamically typed value, so SQL NULL stays
+/// distinguishable from `0` and `""`.
+fn col_value(stmt : @sqlite3.Statement, index : Int32) -> @sqlite3.Value {
+  stmt.column(index~) catch {
+    _ => @sqlite3.Value::Null
+  }
+}
+
+///|
+/// Read a nullable TEXT column. Returns None for SQL NULL.
+fn col_optional_string(stmt : @sqlite3.Statement, index : Int32) -> String? {
+  match col_value(stmt, index) {
+    @sqlite3.Value::Text(value) => Option::Some(value)
+    _ => Option::None
+  }
+}
+
+///|
+/// Read a nullable INTEGER column. Returns None for SQL NULL.
+fn col_optional_int(stmt : @sqlite3.Statement, index : Int32) -> Int32? {
+  match col_value(stmt, index) {
+    @sqlite3.Value::Integer(value) => Option::Some(value.to_int())
+    _ => Option::None
+  }
+}
+
+///|
 /// Read one issue row from the current cursor position of `stmt`.
 /// The SELECT must list `issue_columns` in the canonical order.
 fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
@@ -39,6 +66,9 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
   let is_ephemeral : Int32 = col_int(stmt, 10)
   let acceptance_criteria = col_string(stmt, 11)
   let prerequisites = col_string(stmt, 12)
+  let external_ref = col_optional_string(stmt, 13)
+  let estimate = col_optional_int(stmt, 14)
+  let due_date = col_optional_int(stmt, 15)
 
   Issue::{
     id,
@@ -71,6 +101,9 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
     } else {
       Option::Some(prerequisites)
     },
+    external_ref,
+    estimate,
+    due_date,
     created_at,
     updated_at,
     is_ephemeral: is_ephemeral == 1,
@@ -81,13 +114,14 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
 /// The columns of the canonical issue SELECT, in the order `read_issue_row`
 /// reads them. Every issue query spells these out so a new column only has to
 /// be added in one place.
-let issue_columns : String = "id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites"
+let issue_columns : String = "id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites, external_ref, estimate, due_date"
 
 ///|
 /// A value that can be bound to a statement parameter.
 priv enum SqlParam {
   Text(String)
   Int(Int32)
+  Null
 }
 
 ///|
@@ -112,6 +146,10 @@ fn exec_write(
         stmt.bind(index~, value) catch {
           _ => return Result::Err("bind failed")
         }
+      SqlParam::Null =>
+        stmt.bind(index~, @sqlite3.Value::Null) catch {
+          _ => return Result::Err("bind failed")
+        }
     }
     index += 1
   }
@@ -121,6 +159,24 @@ fn exec_write(
     _ => return Result::Err("finalize failed")
   }
   Result::Ok(())
+}
+
+///|
+/// Bind an optional TEXT value as SQL NULL when it is missing.
+fn optional_text_param(value : String?) -> SqlParam {
+  match value {
+    Option::Some(text) => SqlParam::Text(text)
+    Option::None => SqlParam::Null
+  }
+}
+
+///|
+/// Bind an optional INTEGER value as SQL NULL when it is missing.
+fn optional_int_param(value : Int32?) -> SqlParam {
+  match value {
+    Option::Some(number) => SqlParam::Int(number)
+    Option::None => SqlParam::Null
+  }
 }
 
 ///|
@@ -424,14 +480,25 @@ fn migrate_schema(conn : @sqlite3.Connection) -> Result[Unit, String] {
     }
   }
 
-  for column in ["acceptance_criteria", "prerequisites"] {
+  for
+    column in [
+      "acceptance_criteria", "prerequisites", "external_ref", "estimate", "due_date",
+    ] {
     let present = match column_exists(conn, "issues", column) {
       Result::Ok(v) => v
       Result::Err(e) => return Result::Err(e)
     }
     if !present {
+      let column_type = if column == "estimate" || column == "due_date" {
+        "INTEGER"
+      } else {
+        "TEXT"
+      }
       match
-        exec_sql(conn, "ALTER TABLE issues ADD COLUMN " + column + " TEXT;") {
+        exec_sql(
+          conn,
+          "ALTER TABLE issues ADD COLUMN " + column + " " + column_type + ";",
+        ) {
         Result::Ok(_) => ()
         Result::Err(e) => return Result::Err(e)
       }
@@ -531,7 +598,7 @@ pub fn insert_issue(
 
   exec_write(
     storage,
-    "INSERT INTO issues (id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+    "INSERT INTO issues (id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites, external_ref, estimate, due_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
     [
       SqlParam::Text(issue.id),
       SqlParam::Text(issue.title),
@@ -546,6 +613,9 @@ pub fn insert_issue(
       SqlParam::Int(if issue.is_ephemeral { 1 } else { 0 }),
       SqlParam::Text(acceptance_criteria),
       SqlParam::Text(prerequisites),
+      optional_text_param(issue.external_ref),
+      optional_int_param(issue.estimate),
+      optional_int_param(issue.due_date),
     ],
   )
 }
@@ -803,6 +873,48 @@ pub fn update_issue_priority(
     storage,
     "UPDATE issues SET priority = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
     [SqlParam::Int(priority), SqlParam::Text(id)],
+  )
+}
+
+///|
+/// Update issue external reference, or clear it when `external_ref` is None.
+pub fn update_issue_external_ref(
+  storage : BeadsStorage,
+  id : String,
+  external_ref : String?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET external_ref = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_text_param(external_ref), SqlParam::Text(id)],
+  )
+}
+
+///|
+/// Update the estimate in minutes, or clear it when `estimate` is None.
+pub fn update_issue_estimate(
+  storage : BeadsStorage,
+  id : String,
+  estimate : Int32?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET estimate = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_int_param(estimate), SqlParam::Text(id)],
+  )
+}
+
+///|
+/// Update the due date (Unix seconds), or clear it when `due_date` is None.
+pub fn update_issue_due_date(
+  storage : BeadsStorage,
+  id : String,
+  due_date : Int32?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET due_date = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_int_param(due_date), SqlParam::Text(id)],
   )
 }
 

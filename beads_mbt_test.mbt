@@ -460,6 +460,9 @@ fn build_issue(
     owner: Option::None,
     acceptance_criteria: Option::None,
     prerequisites: Option::None,
+    external_ref: Option::None,
+    estimate: Option::None,
+    due_date: Option::None,
     created_at,
     updated_at: created_at,
     is_ephemeral: false,
@@ -1035,6 +1038,9 @@ fn build_planned_issue(
     owner: Option::None,
     acceptance_criteria,
     prerequisites,
+    external_ref: Option::None,
+    estimate: Option::None,
+    due_date: Option::None,
     created_at: 10,
     updated_at: 10,
     is_ephemeral: false,
@@ -1353,4 +1359,147 @@ test "storage: blocked issues carry their blockers, including inherited ones" {
     }
     Err(_) => assert_eq(true, false)
   }
+}
+
+///|
+test "storage: scheduling columns round-trip and clear back to absent" {
+  match open_fresh("/tmp/beads_test_scheduling_columns.db") {
+    Ok(storage) => {
+      ignore(
+        @lib.insert_issue(
+          storage,
+          @lib.make_issue(
+            "bd-sched1",
+            "Scheduled",
+            estimate=Option::Some(90),
+            due_date=Option::Some(1789117200),
+            external_ref=Option::Some("gh-123"),
+          ),
+        ),
+      )
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-sched2", "Unscheduled")),
+      )
+
+      match @lib.get_issue_by_id(storage, "bd-sched1") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.external_ref, Option::Some("gh-123"))
+          assert_eq(issue.estimate, Option::Some(90))
+          assert_eq(issue.due_date, Option::Some(1789117200))
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      // no value in SQL is NULL, not 0 and not the empty string
+      match @lib.get_issue_by_id(storage, "bd-sched2") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.external_ref, Option::None)
+          assert_eq(issue.estimate, Option::None)
+          assert_eq(issue.due_date, Option::None)
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+
+      ignore(@lib.update_issue_estimate(storage, "bd-sched2", Option::Some(30)))
+      ignore(
+        @lib.update_issue_due_date(
+          storage,
+          "bd-sched2",
+          Option::Some(1789117200),
+        ),
+      )
+      ignore(
+        @lib.update_issue_external_ref(
+          storage,
+          "bd-sched2",
+          Option::Some("jira-9"),
+        ),
+      )
+      match @lib.get_issue_by_id(storage, "bd-sched2") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.external_ref, Option::Some("jira-9"))
+          assert_eq(issue.estimate, Option::Some(30))
+          assert_eq(issue.due_date, Option::Some(1789117200))
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+
+      ignore(@lib.update_issue_estimate(storage, "bd-sched2", Option::None))
+      ignore(@lib.update_issue_due_date(storage, "bd-sched2", Option::None))
+      ignore(@lib.update_issue_external_ref(storage, "bd-sched2", Option::None))
+      match @lib.get_issue_by_id(storage, "bd-sched2") {
+        Ok(Option::Some(issue)) => {
+          assert_eq(issue.external_ref, Option::None)
+          assert_eq(issue.estimate, Option::None)
+          assert_eq(issue.due_date, Option::None)
+        }
+        Ok(Option::None) => assert_eq(true, false)
+        Err(_) => assert_eq(true, false)
+      }
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}
+
+///|
+/// The timestamp `text` parses to, or -1 when it is rejected.
+fn parsed_date(text : String) -> Int32 {
+  match @lib.parse_date_to_timestamp(text) {
+    Ok(value) => value
+    Err(_) => -1
+  }
+}
+
+///|
+test "util: parse_date_to_timestamp accepts the documented forms" {
+  assert_eq(parsed_date("1970-01-01"), 32400)
+  assert_eq(parsed_date("2026-09-11"), 1789117200)
+  assert_eq(parsed_date("2026-10-20T12:34:56Z"), 1792499696)
+  assert_eq(parsed_date(" 2026-09-11 "), 1789117200)
+}
+
+///|
+test "util: parse_date_to_timestamp rejects malformed dates" {
+  for
+    text in [
+      "", "tomorow", "yesterday", "2026-13-01", "2026-09-11T12:34:56", "2026/09/11",
+      "+2x", "2026-09-11T25:00:00Z",
+    ] {
+    assert_eq(parsed_date(text), -1)
+  }
+}
+
+///|
+test "util: relative dates are measured from now" {
+  let before = @lib.current_timestamp()
+  let in_two_days = parsed_date("+2d")
+  let in_one_week = parsed_date("+1w")
+  let in_three_hours = parsed_date("+3h")
+  let after = @lib.current_timestamp()
+  assert_eq(in_two_days >= before + 172800, true)
+  assert_eq(in_two_days <= after + 172800, true)
+  assert_eq(in_one_week >= before + 604800, true)
+  assert_eq(in_one_week <= after + 604800, true)
+  assert_eq(in_three_hours >= before + 10800, true)
+  assert_eq(in_three_hours <= after + 10800, true)
+}
+
+///|
+test "util: tomorrow is 09:00 UTC of the next day" {
+  let now = @lib.current_timestamp()
+  let tomorrow = parsed_date("tomorrow")
+  assert_eq(tomorrow % 86400, 32400)
+  assert_eq(tomorrow > now, true)
+  assert_eq(tomorrow <= now + 2 * 86400, true)
+}
+
+///|
+test "util: format_date is the inverse of the bare date form" {
+  assert_eq(@lib.format_date(32400), "1970-01-01")
+  assert_eq(@lib.format_date(1789117200), "2026-09-11")
+  assert_eq(@lib.format_date(1792499696), "2026-10-20")
+  assert_eq(@lib.format_date(parsed_date("2026-09-11")), "2026-09-11")
 }

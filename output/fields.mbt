@@ -8,8 +8,8 @@
 /// dropping a column.
 let supported_fields : Array[String] = [
   "id", "title", "description", "status", "priority", "issue_type", "assignee", "owner",
-  "acceptance_criteria", "prerequisites", "created_at", "updated_at", "labels", "dependency_count",
-  "dependent_count",
+  "acceptance_criteria", "prerequisites", "external_ref", "estimated_minutes", "due_at",
+  "created_at", "updated_at", "labels", "dependency_count", "dependent_count",
 ]
 
 ///|

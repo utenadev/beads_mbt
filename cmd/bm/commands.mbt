@@ -58,12 +58,48 @@ fn handle_init_command(ctx : Context) -> Int32 {
 }
 
 ///|
+/// Parse `--estimate`: minutes as a non-negative integer, or the empty string
+/// to clear an existing estimate.
+fn estimate_from_flag(value : String) -> Result[Int32?, @output.CliError] {
+  if value.trim().length() == 0 {
+    return Result::Ok(Option::None)
+  }
+  match @lib.parse_non_negative_int(value) {
+    Result::Ok(minutes) => Result::Ok(Option::Some(minutes))
+    Result::Err(e) => Result::Err(invalid_value_error("INVALID_ESTIMATE", e))
+  }
+}
+
+///|
+/// Parse `--due`: a date as `lib.parse_date_to_timestamp` accepts, or the empty
+/// string to clear an existing due date.
+fn due_date_from_flag(value : String) -> Result[Int32?, @output.CliError] {
+  if value.trim().length() == 0 {
+    return Result::Ok(Option::None)
+  }
+  match @lib.parse_date_to_timestamp(value) {
+    Result::Ok(timestamp) => Result::Ok(Option::Some(timestamp))
+    Result::Err(e) => Result::Err(invalid_value_error("INVALID_DATE", e))
+  }
+}
+
+///|
+/// Parse `--external-ref`: an opaque reference, or the empty string to clear it.
+fn ref_from_flag(value : String) -> String? {
+  if value.trim().length() == 0 {
+    Option::None
+  } else {
+    Option::Some(value)
+  }
+}
+
+///|
 fn handle_create_command(ctx : Context) -> Int32 {
   if ctx.args.length() < 3 {
     return fail(
       ctx,
       required_field(
-        "title is required", "bm create <title> [--priority N] [--type TYPE]",
+        "title is required", "bm create <title> [--priority N] [--type TYPE] [--estimate MINUTES] [--due DATE] [--external-ref REF]",
       ),
     )
   }
@@ -71,11 +107,18 @@ fn handle_create_command(ctx : Context) -> Int32 {
   let title = ctx.args[2]
   let mut priority : Int32 = 2
   let mut issue_type = @lib.IssueType::Other
+  let mut estimate : Int32? = Option::None
+  let mut due_date : Int32? = Option::None
+  let mut external_ref : String? = Option::None
 
   let mut index = 3
   while index < ctx.args.length() {
     let arg = ctx.args[index]
-    if arg == "--priority" || arg == "--type" {
+    if arg == "--priority" ||
+      arg == "--type" ||
+      arg == "--estimate" ||
+      arg == "--due" ||
+      arg == "--external-ref" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
       }
@@ -86,12 +129,24 @@ fn handle_create_command(ctx : Context) -> Int32 {
           Result::Err(e) =>
             return fail(ctx, invalid_value_error("INVALID_PRIORITY", e))
         }
-      } else {
+      } else if arg == "--type" {
         match @lib.parse_issue_type(value) {
           Result::Ok(parsed) => issue_type = parsed
           Result::Err(e) =>
             return fail(ctx, invalid_value_error("INVALID_TYPE", e))
         }
+      } else if arg == "--estimate" {
+        match estimate_from_flag(value) {
+          Result::Ok(parsed) => estimate = parsed
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--due" {
+        match due_date_from_flag(value) {
+          Result::Ok(parsed) => due_date = parsed
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else {
+        external_ref = ref_from_flag(value)
       }
       index += 2
     } else if is_flag(arg) {
@@ -103,7 +158,15 @@ fn handle_create_command(ctx : Context) -> Int32 {
 
   with_storage(ctx, fn(storage) {
     let id = @lib.generate_issue_id("bd")
-    let issue = @lib.make_issue(id, title, issue_type~, priority~)
+    let issue = @lib.make_issue(
+      id,
+      title,
+      issue_type~,
+      priority~,
+      estimate~,
+      due_date~,
+      external_ref~,
+    )
     match @lib.insert_issue(storage, issue) {
       Result::Err(e) => Result::Err(@output.storage_error(e))
       Result::Ok(_) =>
@@ -246,7 +309,7 @@ fn handle_update_command(ctx : Context) -> Int32 {
     return fail(
       ctx,
       required_field(
-        "issue ID is required", "bm update <id> [--title TITLE] [--priority N]",
+        "issue ID is required", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--external-ref REF]",
       ),
     )
   }
@@ -254,23 +317,52 @@ fn handle_update_command(ctx : Context) -> Int32 {
   let id = ctx.args[2]
   let mut new_title : String? = Option::None
   let mut new_priority : Int32? = Option::None
+  let mut new_estimate : Int32? = Option::None
+  let mut estimate_given = false
+  let mut new_due_date : Int32? = Option::None
+  let mut due_date_given = false
+  let mut new_external_ref : String? = Option::None
+  let mut external_ref_given = false
 
   let mut index = 3
   while index < ctx.args.length() {
     let arg = ctx.args[index]
-    if arg == "--title" || arg == "--priority" {
+    if arg == "--title" ||
+      arg == "--priority" ||
+      arg == "--estimate" ||
+      arg == "--due" ||
+      arg == "--external-ref" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
       }
       let value = ctx.args[index + 1]
       if arg == "--title" {
         new_title = Option::Some(value)
-      } else {
+      } else if arg == "--priority" {
         match @lib.parse_priority(value) {
           Result::Ok(parsed) => new_priority = Option::Some(parsed)
           Result::Err(e) =>
             return fail(ctx, invalid_value_error("INVALID_PRIORITY", e))
         }
+      } else if arg == "--estimate" {
+        match estimate_from_flag(value) {
+          Result::Ok(parsed) => {
+            new_estimate = parsed
+            estimate_given = true
+          }
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--due" {
+        match due_date_from_flag(value) {
+          Result::Ok(parsed) => {
+            new_due_date = parsed
+            due_date_given = true
+          }
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else {
+        new_external_ref = ref_from_flag(value)
+        external_ref_given = true
       }
       index += 2
     } else if is_flag(arg) {
@@ -280,11 +372,15 @@ fn handle_update_command(ctx : Context) -> Int32 {
     }
   }
 
-  if new_title is None && new_priority is None {
+  if !estimate_given &&
+    !due_date_given &&
+    !external_ref_given &&
+    new_title is None &&
+    new_priority is None {
     return fail(
       ctx,
       required_field(
-        "no updates specified", "bm update <id> [--title TITLE] [--priority N]",
+        "no updates specified", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--external-ref REF]",
       ),
     )
   }
@@ -314,6 +410,39 @@ fn handle_update_command(ctx : Context) -> Int32 {
           Result::Err(e) => return Result::Err(@output.storage_error(e))
         }
       Option::None => ()
+    }
+
+    if estimate_given {
+      match @lib.update_issue_estimate(storage, id, new_estimate) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated estimate")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if due_date_given {
+      match @lib.update_issue_due_date(storage, id, new_due_date) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated due date")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if external_ref_given {
+      match @lib.update_issue_external_ref(storage, id, new_external_ref) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated external reference")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
     }
 
     match ctx.mode {

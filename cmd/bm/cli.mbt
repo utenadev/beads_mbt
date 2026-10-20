@@ -184,6 +184,18 @@ fn print_issue_detail(issue : @lib.Issue) -> Unit {
   println("Status: " + @lib.status_to_string(issue.status))
   println("Priority: P" + issue.priority.to_string())
   println("Type: " + @lib.issue_type_to_string(issue.type_))
+  match issue.external_ref {
+    Option::Some(text) => println("External Ref: " + text)
+    Option::None => ()
+  }
+  match issue.estimate {
+    Option::Some(minutes) => println("Estimate: " + minutes.to_string() + "m")
+    Option::None => ()
+  }
+  match issue.due_date {
+    Option::Some(timestamp) => println("Due: " + @lib.format_date(timestamp))
+    Option::None => ()
+  }
 
   match issue.description {
     Option::Some(text) =>

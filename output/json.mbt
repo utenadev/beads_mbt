@@ -73,6 +73,9 @@ fn issue_field_json(
     "owner" => optional_json(issue.owner)
     "acceptance_criteria" => optional_json(issue.acceptance_criteria)
     "prerequisites" => optional_json(issue.prerequisites)
+    "external_ref" => optional_json(issue.external_ref)
+    "estimated_minutes" => optional_int_json(issue.estimate)
+    "due_at" => optional_int_json(issue.due_date)
     "created_at" => Json::number(issue.created_at.to_double())
     "updated_at" => Json::number(issue.updated_at.to_double())
     "labels" =>
@@ -109,6 +112,15 @@ fn issue_field_json(
 fn optional_json(value : String?) -> Json {
   match value {
     Option::Some(text) => Json::string(text)
+    Option::None => Json::null()
+  }
+}
+
+///|
+/// A nullable integer as JSON: `null` when the issue has no value.
+fn optional_int_json(value : Int32?) -> Json {
+  match value {
+    Option::Some(number) => Json::number(number.to_double())
     Option::None => Json::null()
   }
 }
