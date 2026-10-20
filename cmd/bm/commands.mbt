@@ -71,9 +71,9 @@ fn estimate_from_flag(value : String) -> Result[Int32?, @output.CliError] {
 }
 
 ///|
-/// Parse `--due`: a date as `lib.parse_date_to_timestamp` accepts, or the empty
-/// string to clear an existing due date.
-fn due_date_from_flag(value : String) -> Result[Int32?, @output.CliError] {
+/// Parse a date flag (`--due`, `--defer`, `defer --until`): a date as
+/// `lib.parse_date_to_timestamp` accepts, or the empty string to clear it.
+fn optional_date_from_flag(value : String) -> Result[Int32?, @output.CliError] {
   if value.trim().length() == 0 {
     return Result::Ok(Option::None)
   }
@@ -99,7 +99,7 @@ fn handle_create_command(ctx : Context) -> Int32 {
     return fail(
       ctx,
       required_field(
-        "title is required", "bm create <title> [--priority N] [--type TYPE] [--estimate MINUTES] [--due DATE] [--external-ref REF]",
+        "title is required", "bm create <title> [--priority N] [--type TYPE] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF]",
       ),
     )
   }
@@ -109,6 +109,7 @@ fn handle_create_command(ctx : Context) -> Int32 {
   let mut issue_type = @lib.IssueType::Other
   let mut estimate : Int32? = Option::None
   let mut due_date : Int32? = Option::None
+  let mut defer_until : Int32? = Option::None
   let mut external_ref : String? = Option::None
 
   let mut index = 3
@@ -118,6 +119,7 @@ fn handle_create_command(ctx : Context) -> Int32 {
       arg == "--type" ||
       arg == "--estimate" ||
       arg == "--due" ||
+      arg == "--defer" ||
       arg == "--external-ref" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
@@ -141,8 +143,13 @@ fn handle_create_command(ctx : Context) -> Int32 {
           Result::Err(e) => return fail(ctx, e)
         }
       } else if arg == "--due" {
-        match due_date_from_flag(value) {
+        match optional_date_from_flag(value) {
           Result::Ok(parsed) => due_date = parsed
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--defer" {
+        match optional_date_from_flag(value) {
+          Result::Ok(parsed) => defer_until = parsed
           Result::Err(e) => return fail(ctx, e)
         }
       } else {
@@ -165,6 +172,7 @@ fn handle_create_command(ctx : Context) -> Int32 {
       priority~,
       estimate~,
       due_date~,
+      defer_until~,
       external_ref~,
     )
     match @lib.insert_issue(storage, issue) {
@@ -204,6 +212,7 @@ fn handle_list_command(ctx : Context) -> Int32 {
     excludes: true,
     fields: true,
     brief: false,
+    include_deferred: false,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)
@@ -257,6 +266,7 @@ fn handle_show_command(ctx : Context) -> Int32 {
     excludes: false,
     fields: false,
     brief: false,
+    include_deferred: false,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)
@@ -309,7 +319,7 @@ fn handle_update_command(ctx : Context) -> Int32 {
     return fail(
       ctx,
       required_field(
-        "issue ID is required", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--external-ref REF]",
+        "issue ID is required", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF]",
       ),
     )
   }
@@ -321,6 +331,8 @@ fn handle_update_command(ctx : Context) -> Int32 {
   let mut estimate_given = false
   let mut new_due_date : Int32? = Option::None
   let mut due_date_given = false
+  let mut new_defer_until : Int32? = Option::None
+  let mut defer_until_given = false
   let mut new_external_ref : String? = Option::None
   let mut external_ref_given = false
 
@@ -331,6 +343,7 @@ fn handle_update_command(ctx : Context) -> Int32 {
       arg == "--priority" ||
       arg == "--estimate" ||
       arg == "--due" ||
+      arg == "--defer" ||
       arg == "--external-ref" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
@@ -353,10 +366,18 @@ fn handle_update_command(ctx : Context) -> Int32 {
           Result::Err(e) => return fail(ctx, e)
         }
       } else if arg == "--due" {
-        match due_date_from_flag(value) {
+        match optional_date_from_flag(value) {
           Result::Ok(parsed) => {
             new_due_date = parsed
             due_date_given = true
+          }
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--defer" {
+        match optional_date_from_flag(value) {
+          Result::Ok(parsed) => {
+            new_defer_until = parsed
+            defer_until_given = true
           }
           Result::Err(e) => return fail(ctx, e)
         }
@@ -374,13 +395,14 @@ fn handle_update_command(ctx : Context) -> Int32 {
 
   if !estimate_given &&
     !due_date_given &&
+    !defer_until_given &&
     !external_ref_given &&
     new_title is None &&
     new_priority is None {
     return fail(
       ctx,
       required_field(
-        "no updates specified", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--external-ref REF]",
+        "no updates specified", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF]",
       ),
     )
   }
@@ -428,6 +450,17 @@ fn handle_update_command(ctx : Context) -> Int32 {
         Result::Ok(_) =>
           match ctx.mode {
             OutputMode::Text => println("Updated due date")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if defer_until_given {
+      match @lib.update_issue_defer_until(storage, id, new_defer_until) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated defer date")
             OutputMode::Json => ()
           }
         Result::Err(e) => return Result::Err(@output.storage_error(e))
@@ -489,17 +522,75 @@ fn handle_sync_command(ctx : Context) -> Int32 {
 ///|
 fn handle_defer_command(ctx : Context) -> Int32 {
   if ctx.args.length() < 3 {
-    return fail(ctx, required_field("issue ID is required", "bm defer <id>"))
+    return fail(
+      ctx,
+      required_field("issue ID is required", "bm defer <id> [--until DATE]"),
+    )
+  }
+
+  let id = ctx.args[2]
+  let mut until : Int32? = Option::None
+  let mut until_given = false
+
+  let mut index = 3
+  while index < ctx.args.length() {
+    let arg = ctx.args[index]
+    if arg == "--until" {
+      if index + 1 >= ctx.args.length() {
+        return fail(ctx, missing_value_error(arg))
+      }
+      match optional_date_from_flag(ctx.args[index + 1]) {
+        Result::Ok(parsed) => {
+          until = parsed
+          until_given = true
+        }
+        Result::Err(e) => return fail(ctx, e)
+      }
+      index += 2
+    } else if is_flag(arg) {
+      return fail(ctx, unknown_option_error(arg))
+    } else {
+      index += 1
+    }
+  }
+
+  with_storage(ctx, fn(storage) {
+    match @lib.defer_issue(storage, id) {
+      Result::Err(e) => Result::Err(@output.storage_error(e))
+      Result::Ok(_) => {
+        if until_given {
+          match @lib.update_issue_defer_until(storage, id, until) {
+            Result::Err(e) => return Result::Err(@output.storage_error(e))
+            Result::Ok(_) => ()
+          }
+        }
+        match ctx.mode {
+          OutputMode::Text => {
+            println("Deferred: " + id)
+            Result::Ok(())
+          }
+          OutputMode::Json => print_stored_issue(storage, id)
+        }
+      }
+    }
+  })
+}
+
+///|
+/// Clear the `defer_until` gate and put a deferred issue back to open.
+fn handle_undefer_command(ctx : Context) -> Int32 {
+  if ctx.args.length() < 3 {
+    return fail(ctx, required_field("issue ID is required", "bm undefer <id>"))
   }
 
   let id = ctx.args[2]
   with_storage(ctx, fn(storage) {
-    match @lib.defer_issue(storage, id) {
+    match @lib.undefer_issue(storage, id) {
       Result::Err(e) => Result::Err(@output.storage_error(e))
       Result::Ok(_) =>
         match ctx.mode {
           OutputMode::Text => {
-            println("Deferred: " + id)
+            println("Undeferred: " + id)
             Result::Ok(())
           }
           OutputMode::Json => print_stored_issue(storage, id)

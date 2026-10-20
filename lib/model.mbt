@@ -47,6 +47,7 @@ pub(all) struct Issue {
   external_ref : String?
   estimate : Int32?
   due_date : Int32?
+  defer_until : Int32?
   created_at : Int32
   updated_at : Int32
   is_ephemeral : Bool
@@ -56,8 +57,8 @@ pub(all) struct Issue {
 /// Create a new issue with default values.
 /// `issue_type` and `priority` can be supplied by callers that already know
 /// them, such as `bm create --type` / `--priority`. `external_ref`, `estimate`
-/// (minutes), and `due_date` (Unix seconds) come from the matching `bm create`
-/// flags.
+/// (minutes), `due_date` (Unix seconds), and `defer_until` (the `bm ready` time
+/// gate) come from the matching `bm create` flags.
 pub fn make_issue(
   id : String,
   title : String,
@@ -66,6 +67,7 @@ pub fn make_issue(
   external_ref~ : String? = Option::None,
   estimate~ : Int32? = Option::None,
   due_date~ : Int32? = Option::None,
+  defer_until~ : Int32? = Option::None,
 ) -> Issue {
   let timestamp = current_timestamp()
   Issue::{
@@ -82,6 +84,7 @@ pub fn make_issue(
     external_ref,
     estimate,
     due_date,
+    defer_until,
     created_at: timestamp,
     updated_at: timestamp,
     is_ephemeral: false,

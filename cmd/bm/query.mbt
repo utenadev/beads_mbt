@@ -8,6 +8,7 @@ fn handle_ready_command(ctx : Context) -> Int32 {
     excludes: true,
     fields: false,
     brief: true,
+    include_deferred: true,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)
@@ -23,7 +24,8 @@ fn handle_ready_command(ctx : Context) -> Int32 {
   }
 
   with_storage(ctx, fn(storage) {
-    let issues = match @lib.get_ready_issues(storage) {
+    let issues = match
+      @lib.get_ready_issues(storage, include_deferred=options.include_deferred) {
       Result::Ok(issues) => issues
       Result::Err(e) => return Result::Err(@output.storage_error(e))
     }
@@ -62,6 +64,7 @@ fn handle_blocked_command(ctx : Context) -> Int32 {
     excludes: false,
     fields: false,
     brief: false,
+    include_deferred: false,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)
@@ -115,6 +118,7 @@ fn handle_search_command(ctx : Context) -> Int32 {
     excludes: true,
     fields: true,
     brief: false,
+    include_deferred: false,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)

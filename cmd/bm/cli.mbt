@@ -196,6 +196,11 @@ fn print_issue_detail(issue : @lib.Issue) -> Unit {
     Option::Some(timestamp) => println("Due: " + @lib.format_date(timestamp))
     Option::None => ()
   }
+  match issue.defer_until {
+    Option::Some(timestamp) =>
+      println("Deferred until: " + @lib.format_date(timestamp))
+    Option::None => ()
+  }
 
   match issue.description {
     Option::Some(text) =>
@@ -232,6 +237,7 @@ struct QueryFlags {
   excludes : Bool
   fields : Bool
   brief : Bool
+  include_deferred : Bool
 }
 
 ///|
@@ -242,6 +248,7 @@ struct QueryOptions {
   excludes : Array[String]
   fields : String?
   brief : Bool
+  include_deferred : Bool
   error : @output.CliError?
 }
 
@@ -258,6 +265,7 @@ fn parse_query_options(
   let excludes : Array[String] = []
   let mut fields : String? = Option::None
   let mut brief = false
+  let mut include_deferred = false
   let mut error : @output.CliError? = Option::None
   let mut only_positionals = false
 
@@ -289,6 +297,9 @@ fn parse_query_options(
     } else if arg == "--brief" && flags.brief {
       brief = true
       index += 1
+    } else if arg == "--include-deferred" && flags.include_deferred {
+      include_deferred = true
+      index += 1
     } else if is_flag(arg) {
       error = Option::Some(unknown_option_error(arg))
       index += 1
@@ -297,5 +308,12 @@ fn parse_query_options(
       index += 1
     }
   }
-  QueryOptions::{ positionals, excludes, fields, brief, error, }
+  QueryOptions::{
+    positionals,
+    excludes,
+    fields,
+    brief,
+    include_deferred,
+    error,
+  }
 }

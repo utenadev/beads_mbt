@@ -247,6 +247,92 @@ test_defer() {
     fi
 }
 
+test_defer_gate() {
+    test_start "Test: --defer gates bm ready until the date"
+
+    gated=$(run_cmd create "Gated work" --defer +1d | sed 's/Created: //')
+    elapsed=$(run_cmd create "Elapsed gate" --defer 2020-01-01 | sed 's/Created: //')
+    if [ -z "$gated" ] || [ -z "$elapsed" ]; then
+        test_fail "create with --defer should return issue ids"
+        return
+    fi
+
+    ready_output=$(run_cmd ready)
+    if echo "$ready_output" | grep -q "$gated"; then
+        test_fail "a future --defer should keep the issue out of ready"
+        echo "Output: $ready_output"
+        return
+    fi
+    if ! echo "$ready_output" | grep -q "$elapsed"; then
+        test_fail "an elapsed --defer should not hide the issue"
+        return
+    fi
+    if ! run_cmd ready --include-deferred | grep -q "$gated"; then
+        test_fail "ready --include-deferred should reveal the gated issue"
+        return
+    fi
+    if ! run_cmd show "$gated" | grep -q "Deferred until:"; then
+        test_fail "show should print the defer date"
+        return
+    fi
+
+    # an empty --defer clears the gate
+    run_cmd update "$gated" --defer "" > /dev/null
+    if ! run_cmd ready | grep -q "$gated"; then
+        test_fail "an empty --defer should clear the gate"
+        return
+    fi
+
+    # defer --until sets both the status and the gate, undefer undoes both
+    run_cmd defer "$elapsed" --until +7d > /dev/null
+    if run_cmd ready | grep -q "$elapsed"; then
+        test_fail "defer --until should set the deferred status"
+        return
+    fi
+    if ! run_cmd undefer "$elapsed" | grep -q "Undeferred:"; then
+        test_fail "undefer should report the change"
+        return
+    fi
+    if ! run_cmd ready | grep -q "$elapsed"; then
+        test_fail "undefer should clear the gate and reopen the issue"
+        return
+    fi
+
+    test_pass "defer gate, --include-deferred, and undefer work end to end"
+}
+
+test_comments_author() {
+    test_start "Test: comments add --author"
+
+    issue=$(run_cmd create "Commented work" | sed 's/Created: //')
+    if [ -z "$issue" ]; then
+        test_fail "create should return an issue id"
+        return
+    fi
+
+    run_cmd comments add "$issue" "hello" --author alice > /dev/null
+    text=$(run_cmd comments list "$issue")
+    if ! echo "$text" | grep -q "\[alice\] hello"; then
+        test_fail "comments list should print the author"
+        echo "Output: $text"
+        return
+    fi
+
+    json=$(run_cmd_stdout comments list "$issue" --json)
+    if ! echo "$json" | grep -q '"author":"alice"'; then
+        test_fail "comments list --json should write the author"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"text":"hello"'; then
+        test_fail "comments list --json should write text, not body"
+        echo "Output: $json"
+        return
+    fi
+
+    test_pass "comments carry the author in text and JSON output"
+}
+
 test_create_flags() {
     test_start "Test: create with --priority and --type"
 
@@ -724,6 +810,8 @@ main() {
     test_close
     test_ready
     test_defer
+    test_defer_gate
+    test_comments_author
     test_create_flags
     test_create_flags_reject_invalid
     test_scheduling_flags
