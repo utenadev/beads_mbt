@@ -178,12 +178,33 @@ fn format_issue_line(issue : @lib.Issue) -> String {
 ///|
 /// Print one issue block: the identifying fields, then whichever free-text
 /// planning sections the issue carries.
-fn print_issue_detail(issue : @lib.Issue) -> Unit {
+fn print_issue_detail(issue : @lib.Issue, parent : String?) -> Unit {
   println("Issue: " + issue.id)
   println("Title: " + issue.title)
   println("Status: " + @lib.status_to_string(issue.status))
   println("Priority: P" + issue.priority.to_string())
   println("Type: " + @lib.issue_type_to_string(issue.type_))
+  match parent {
+    Option::Some(id) => println("Parent: " + id)
+    Option::None => ()
+  }
+  match issue.external_ref {
+    Option::Some(text) => println("External Ref: " + text)
+    Option::None => ()
+  }
+  match issue.estimate {
+    Option::Some(minutes) => println("Estimate: " + minutes.to_string() + "m")
+    Option::None => ()
+  }
+  match issue.due_date {
+    Option::Some(timestamp) => println("Due: " + @lib.format_date(timestamp))
+    Option::None => ()
+  }
+  match issue.defer_until {
+    Option::Some(timestamp) =>
+      println("Deferred until: " + @lib.format_date(timestamp))
+    Option::None => ()
+  }
 
   match issue.description {
     Option::Some(text) =>
@@ -220,6 +241,7 @@ struct QueryFlags {
   excludes : Bool
   fields : Bool
   brief : Bool
+  include_deferred : Bool
 }
 
 ///|
@@ -230,6 +252,7 @@ struct QueryOptions {
   excludes : Array[String]
   fields : String?
   brief : Bool
+  include_deferred : Bool
   error : @output.CliError?
 }
 
@@ -246,6 +269,7 @@ fn parse_query_options(
   let excludes : Array[String] = []
   let mut fields : String? = Option::None
   let mut brief = false
+  let mut include_deferred = false
   let mut error : @output.CliError? = Option::None
   let mut only_positionals = false
 
@@ -277,6 +301,9 @@ fn parse_query_options(
     } else if arg == "--brief" && flags.brief {
       brief = true
       index += 1
+    } else if arg == "--include-deferred" && flags.include_deferred {
+      include_deferred = true
+      index += 1
     } else if is_flag(arg) {
       error = Option::Some(unknown_option_error(arg))
       index += 1
@@ -285,5 +312,12 @@ fn parse_query_options(
       index += 1
     }
   }
-  QueryOptions::{ positionals, excludes, fields, brief, error, }
+  QueryOptions::{
+    positionals,
+    excludes,
+    fields,
+    brief,
+    include_deferred,
+    error,
+  }
 }

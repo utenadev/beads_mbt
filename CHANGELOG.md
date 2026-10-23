@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `external_ref`, `estimate` (minutes), and `due_date` (Unix seconds) on issues: `bm create --external-ref REF --estimate MINUTES --due DATE`, the same flags on `bm update` (an empty value clears the field), `bm show` lines, and the `external_ref` / `estimated_minutes` / `due_at` JSON fields (beads_rust names)
+- Dates accept `YYYY-MM-DD` (09:00 UTC), `YYYY-MM-DDTHH:MM:SSZ`, `+Nd` / `+Nw` / `+Nh`, and `tomorrow`; `format_date` prints the same day back in `bm show`
+- The schema migration to version 2 now also adds `external_ref`, `estimate`, and `due_date` when a version 1 database lacks them
+- `defer_until`, the `bm ready` time gate: `bm create --defer DATE` / `bm update --defer DATE` (an empty value clears it), `bm defer <id> --until DATE`, `bm undefer <id>`, a `Deferred until:` line in `bm show`, and the `defer_until` JSON field
+- `bm ready` hides issues whose `defer_until` is still in the future, even when their status is `open`; `bm ready --include-deferred` shows the gated backlog and deferred issues
+- `comments.author` (schema version 3, default `bm`) and `bm comments add --author NAME`
+- `--parent ID` on `bm create` / `bm update`, which writes a `parent-child` dependency edge (an empty value removes it on update); `bm show` prints `Parent:`, JSON exposes `parent_id`, and a child inherits its parent's blockers
+
+### Changed
+- `bm comments list --json` writes one object per comment (`id`, `issue_id`, `author`, `text`, `created_at`) instead of an array of strings, matching beads_rust; `comments add --json` reports the new comment's id, author, and text
+- Schema version 3: the migration adds `issues.defer_until` and `comments.author` to older databases
+
 ## [0.2.1] - 2026-10-19
 
 ### Changed

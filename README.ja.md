@@ -47,10 +47,16 @@ bm init
 ```bash
 bm create "Issue のタイトル"
 bm create "Issue のタイトル" --priority P1 --type bug
+bm create "Issue のタイトル" --estimate 30 --due +2d --external-ref gh-123
+bm create "子 Issue" --parent bd-xxxxxx
 ```
 `--priority` は `0`〜`4` または `P0`〜`P4`、`--type` は
 `bug` / `feature` / `task` / `documentation`（`docs` も可）/ `question` / `other`
-を受け付けます。
+を受け付けます。`--estimate` は分単位の見積り、`--external-ref` は GitHub の
+Issue 番号などの外部参照、`--due` は `YYYY-MM-DD`（09:00 UTC）、
+`YYYY-MM-DDTHH:MM:SSZ`、`+Nd`/`+Nw`/`+Nh`、`tomorrow` を受け付けます。
+`--parent` は `parent-child` 依存エッジを保存するため、子は親のブロッカーを
+継承します。`bm show` は `Parent:` を表示し、JSON は `parent_id` を出力します。
 
 ### Issue 一覧表示
 ```bash
@@ -70,6 +76,10 @@ Issue が値を持っている場合のみ `Prerequisites:` と `Acceptance Crit
 ```bash
 bm update "bd-xxxxxx" --title "新しいタイトル"
 bm update "bd-xxxxxx" --priority 2
+bm update "bd-xxxxxx" --estimate 45 --due 2026-11-01 --external-ref gh-123
+bm update "bd-xxxxxx" --due ""      # 空文字は値をクリアします
+bm update "bd-xxxxxx" --parent bd-yyyyyy
+bm update "bd-xxxxxx" --parent ""   # 親エッジを削除します
 ```
 
 ### Issue 完了
@@ -86,7 +96,16 @@ bm ready --brief
 ### Issue 延期
 ```bash
 bm defer "bd-xxxxxx"
+bm defer "bd-xxxxxx" --until 2026-11-01
+bm undefer "bd-xxxxxx"
 ```
+`bm defer` は Issue を `deferred` にします。`--until` を付けると `defer_until`
+の時間ゲートも設定します。未来のゲートはステータスが `open` のままでも
+`bm ready` から除外するため、`bm create "..." --defer 2026-11-01` や
+`bm update <id> --defer 2026-11-01`（空文字でクリア）で作業を予約できます。
+`bm ready --include-deferred` はゲート済みのバックログも表示し、`bm show` は
+`Deferred until:` を出力します。`bm undefer` はゲートを消し、`deferred` の
+Issue を `open` に戻します。
 
 ### ブロック中 Issue 表示
 ```bash
@@ -128,8 +147,11 @@ bm label list-all
 ### コメントの管理
 ```bash
 bm comments add "bd-xxxxxx" "コメント本文"
+bm comments add "bd-xxxxxx" "コメント本文" --author alice
 bm comments list "bd-xxxxxx"
 ```
+`--author` の既定値は `bm` です。`bm comments list --json` はコメントごとに
+`id` / `issue_id` / `author` / `text` / `created_at` を持つオブジェクトを出力します。
 
 ## 機械可読出力
 
@@ -193,6 +215,7 @@ bm list --json --fields id,title,labels,dependency_count,dependent_count
 
 指定できる名前: `id`, `title`, `description`, `status`, `priority`,
 `issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
+`external_ref`, `estimated_minutes`, `due_at`, `defer_until`, `parent_id`,
 `created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`。
 `labels` と依存件数は追加クエリが必要なため、指定されたときだけ読み込みます。
 `bm ready --brief` は
@@ -275,6 +298,9 @@ MoonBit ツールチェーン `moon` 0.1.20261016（`moonc` v0.10.16）でビル
 3. **エラーメッセージ**: 英語のみ
 4. **検索の大文字小文字**: `bm search` が畳み込むのは ASCII のみで、アクセント付き文字はそのまま一致させる必要があります（beads_rust は非 ASCII も畳み込みます）
 5. **TOON 出力**: `--format` は `text` と `json` のみ受け付けます
+6. **日付のみの指定**: `YYYY-MM-DD` は 09:00 UTC として扱います。beads_rust は
+   09:00 ローカルタイムとして解決しますが、そのためにはタイムゾーンデータベースが
+   必要で、bm は同梱していません
 
 ## 今後の作業
 1. **JSONL sync**: データベースから JSONL への同期

@@ -67,7 +67,7 @@ test "output: @output.parse_fields rejects unknown and empty names" {
 test "output: supported fields cover the documented names" {
   assert_eq(
     @output.supported_fields_text(),
-    "id, title, description, status, priority, issue_type, assignee, owner, acceptance_criteria, prerequisites, created_at, updated_at, labels, dependency_count, dependent_count",
+    "id, title, description, status, priority, issue_type, assignee, owner, acceptance_criteria, prerequisites, external_ref, estimated_minutes, due_at, defer_until, parent_id, created_at, updated_at, labels, dependency_count, dependent_count",
   )
 }
 
@@ -75,9 +75,11 @@ test "output: supported fields cover the documented names" {
 test "output: the default projection is the issue row" {
   assert_eq(
     @output.default_fields().join(","),
-    "id,title,description,status,priority,issue_type,assignee,owner,acceptance_criteria,prerequisites,created_at,updated_at",
+    "id,title,description,status,priority,issue_type,assignee,owner,acceptance_criteria,prerequisites,external_ref,estimated_minutes,due_at,defer_until,parent_id,created_at,updated_at",
   )
-  assert_eq(@output.needs_issue_facts(@output.default_fields()), false)
+  // parent_id lives in the dependency edges, so the default projection needs
+  // the facts even though the row itself comes from one query
+  assert_eq(@output.needs_issue_facts(@output.default_fields()), true)
   assert_eq(@output.needs_issue_facts(["id", "labels"]), true)
   assert_eq(@output.needs_issue_facts(["id", "dependency_count"]), true)
   assert_eq(@output.needs_issue_facts(["id"]), false)
@@ -117,6 +119,7 @@ test "output: labels and counts come from the loaded facts" {
     labels: ["alpha", "beta"],
     dependency_count: 2,
     dependent_count: 1,
+    parent_id: Option::None,
   }
   assert_eq(
     @output.issue_json(
@@ -170,5 +173,56 @@ test "output: @output.search_json keeps the search keys" {
   assert_eq(
     @output.search_json([], 0, 50, 0, true).stringify(),
     "{\"issues\":[],\"hidden_closed_count\":0,\"limit\":50,\"offset\":0,\"has_more\":true}",
+  )
+}
+
+///|
+test "output: scheduling fields are null when unset" {
+  let issue = @lib.make_issue("bd-1", "Title")
+  assert_eq(
+    @output.issue_json(
+      issue,
+      ["external_ref", "estimated_minutes", "due_at"],
+      None,
+    ).stringify(),
+    "{\"external_ref\":null,\"estimated_minutes\":null,\"due_at\":null}",
+  )
+}
+
+///|
+test "output: scheduling fields use the beads_rust names" {
+  let issue = @lib.make_issue(
+    "bd-2",
+    "Scheduled",
+    external_ref=Option::Some("gh-42"),
+    estimate=Option::Some(45),
+    due_date=Option::Some(1789117200),
+  )
+  assert_eq(
+    @output.issue_json(
+      issue,
+      ["external_ref", "estimated_minutes", "due_at"],
+      None,
+    ).stringify(),
+    "{\"external_ref\":\"gh-42\",\"estimated_minutes\":45,\"due_at\":1789117200}",
+  )
+}
+
+///|
+test "output: parent_id comes from the loaded facts" {
+  let issue = @lib.make_issue("bd-1", "Child")
+  assert_eq(
+    @output.issue_json(issue, ["parent_id"], None).stringify(),
+    "{\"parent_id\":null}",
+  )
+  let facts = @lib.IssueFacts::{
+    labels: [],
+    dependency_count: 1,
+    dependent_count: 0,
+    parent_id: Option::Some("bd-parent"),
+  }
+  assert_eq(
+    @output.issue_json(issue, ["parent_id"], Some(facts)).stringify(),
+    "{\"parent_id\":\"bd-parent\"}",
   )
 }

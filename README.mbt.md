@@ -55,9 +55,16 @@ bm init
 ```bash
 bm create "Issue title"
 bm create "Issue title" --priority P1 --type bug
+bm create "Issue title" --estimate 30 --due +2d --external-ref gh-123
+bm create "Child issue" --parent bd-xxxxxx
 ```
 `--priority` accepts `0`-`4` or `P0`-`P4`, `--type` accepts
 `bug`, `feature`, `task`, `documentation` (or `docs`), `question`, `other`.
+`--estimate` is a time estimate in minutes, `--external-ref` is an opaque
+reference such as a GitHub issue number, and `--due` takes `YYYY-MM-DD`
+(09:00 UTC), `YYYY-MM-DDTHH:MM:SSZ`, `+Nd`/`+Nw`/`+Nh`, or `tomorrow`.
+`--parent` stores a `parent-child` dependency edge, so the child inherits the
+parent's blockers; `bm show` prints `Parent:` and JSON writes `parent_id`.
 
 ### List Issues
 ```bash
@@ -77,6 +84,10 @@ exit code `3`, so a partly printed list never looks complete.
 ```bash
 bm update "bd-xxxxxx" --title "New title"
 bm update "bd-xxxxxx" --priority 2
+bm update "bd-xxxxxx" --estimate 45 --due 2026-11-01 --external-ref gh-123
+bm update "bd-xxxxxx" --due ""      # an empty value clears the field
+bm update "bd-xxxxxx" --parent bd-yyyyyy
+bm update "bd-xxxxxx" --parent ""   # removes the parent edge
 ```
 
 ### Close Issue
@@ -93,7 +104,16 @@ bm ready --brief
 ### Defer Issue
 ```bash
 bm defer "bd-xxxxxx"
+bm defer "bd-xxxxxx" --until 2026-11-01
+bm undefer "bd-xxxxxx"
 ```
+`bm defer` moves the issue to `deferred`; `--until` also sets the `defer_until`
+time gate. A future gate keeps the issue out of `bm ready` even while its status
+is `open` — schedule work with `bm create "..." --defer 2026-11-01` or
+`bm update <id> --defer 2026-11-01` (an empty value clears it). `bm ready
+--include-deferred` shows the gated backlog, and `bm show` prints
+`Deferred until:`. `bm undefer` clears the gate and puts a deferred issue back
+to `open`.
 
 ### Show Blocked Issues
 ```bash
@@ -136,8 +156,11 @@ bm label list-all
 ### Manage Comments
 ```bash
 bm comments add "bd-xxxxxx" "Comment body"
+bm comments add "bd-xxxxxx" "Comment body" --author alice
 bm comments list "bd-xxxxxx"
 ```
+`--author` defaults to `bm`. `bm comments list --json` writes one object per
+comment with `id`, `issue_id`, `author`, `text`, and `created_at`.
 
 ## Machine-readable output
 
@@ -204,6 +227,7 @@ bm list --json --fields id,title,labels,dependency_count,dependent_count
 
 Supported names: `id`, `title`, `description`, `status`, `priority`,
 `issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
+`external_ref`, `estimated_minutes`, `due_at`, `defer_until`, `parent_id`,
 `created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`.
 `labels` and the dependency counts need extra queries, so they are only loaded
 when a projection asks for them. `bm ready --brief` selects
@@ -286,6 +310,8 @@ Built and tested with MoonBit toolchain `moon` 0.1.20261016 (`moonc` v0.10.16). 
 3. **Error messages**: English only
 4. **Search case folding**: `bm search` folds ASCII case only, so accented text has to match verbatim (beads_rust folds non-ASCII case too)
 5. **TOON output**: `--format` accepts `text` and `json` only
+6. **Bare due dates**: `YYYY-MM-DD` means 09:00 UTC; beads_rust resolves it to
+   09:00 local time, which needs a time-zone database bm does not ship
 
 ## Future Work
 1. **JSONL sync**: Database to JSONL synchronization

@@ -58,12 +58,48 @@ fn handle_init_command(ctx : Context) -> Int32 {
 }
 
 ///|
+/// Parse `--estimate`: minutes as a non-negative integer, or the empty string
+/// to clear an existing estimate.
+fn estimate_from_flag(value : String) -> Result[Int32?, @output.CliError] {
+  if value.trim().length() == 0 {
+    return Result::Ok(Option::None)
+  }
+  match @lib.parse_non_negative_int(value) {
+    Result::Ok(minutes) => Result::Ok(Option::Some(minutes))
+    Result::Err(e) => Result::Err(invalid_value_error("INVALID_ESTIMATE", e))
+  }
+}
+
+///|
+/// Parse a date flag (`--due`, `--defer`, `defer --until`): a date as
+/// `lib.parse_date_to_timestamp` accepts, or the empty string to clear it.
+fn optional_date_from_flag(value : String) -> Result[Int32?, @output.CliError] {
+  if value.trim().length() == 0 {
+    return Result::Ok(Option::None)
+  }
+  match @lib.parse_date_to_timestamp(value) {
+    Result::Ok(timestamp) => Result::Ok(Option::Some(timestamp))
+    Result::Err(e) => Result::Err(invalid_value_error("INVALID_DATE", e))
+  }
+}
+
+///|
+/// Parse `--external-ref`: an opaque reference, or the empty string to clear it.
+fn ref_from_flag(value : String) -> String? {
+  if value.trim().length() == 0 {
+    Option::None
+  } else {
+    Option::Some(value)
+  }
+}
+
+///|
 fn handle_create_command(ctx : Context) -> Int32 {
   if ctx.args.length() < 3 {
     return fail(
       ctx,
       required_field(
-        "title is required", "bm create <title> [--priority N] [--type TYPE]",
+        "title is required", "bm create <title> [--priority N] [--type TYPE] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF] [--parent ID]",
       ),
     )
   }
@@ -71,11 +107,22 @@ fn handle_create_command(ctx : Context) -> Int32 {
   let title = ctx.args[2]
   let mut priority : Int32 = 2
   let mut issue_type = @lib.IssueType::Other
+  let mut estimate : Int32? = Option::None
+  let mut due_date : Int32? = Option::None
+  let mut defer_until : Int32? = Option::None
+  let mut external_ref : String? = Option::None
+  let mut parent : String? = Option::None
 
   let mut index = 3
   while index < ctx.args.length() {
     let arg = ctx.args[index]
-    if arg == "--priority" || arg == "--type" {
+    if arg == "--priority" ||
+      arg == "--type" ||
+      arg == "--estimate" ||
+      arg == "--due" ||
+      arg == "--defer" ||
+      arg == "--external-ref" ||
+      arg == "--parent" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
       }
@@ -86,12 +133,31 @@ fn handle_create_command(ctx : Context) -> Int32 {
           Result::Err(e) =>
             return fail(ctx, invalid_value_error("INVALID_PRIORITY", e))
         }
-      } else {
+      } else if arg == "--type" {
         match @lib.parse_issue_type(value) {
           Result::Ok(parsed) => issue_type = parsed
           Result::Err(e) =>
             return fail(ctx, invalid_value_error("INVALID_TYPE", e))
         }
+      } else if arg == "--estimate" {
+        match estimate_from_flag(value) {
+          Result::Ok(parsed) => estimate = parsed
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--due" {
+        match optional_date_from_flag(value) {
+          Result::Ok(parsed) => due_date = parsed
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--defer" {
+        match optional_date_from_flag(value) {
+          Result::Ok(parsed) => defer_until = parsed
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--parent" {
+        parent = ref_from_flag(value)
+      } else {
+        external_ref = ref_from_flag(value)
       }
       index += 2
     } else if is_flag(arg) {
@@ -103,16 +169,29 @@ fn handle_create_command(ctx : Context) -> Int32 {
 
   with_storage(ctx, fn(storage) {
     let id = @lib.generate_issue_id("bd")
-    let issue = @lib.make_issue(id, title, issue_type~, priority~)
+    let issue = @lib.make_issue(
+      id,
+      title,
+      issue_type~,
+      priority~,
+      estimate~,
+      due_date~,
+      defer_until~,
+      external_ref~,
+    )
     match @lib.insert_issue(storage, issue) {
       Result::Err(e) => Result::Err(@output.storage_error(e))
       Result::Ok(_) =>
-        match ctx.mode {
-          OutputMode::Text => {
-            println("Created: " + id)
-            Result::Ok(())
-          }
-          OutputMode::Json => print_stored_issue(storage, id)
+        match @lib.set_parent(storage, id, parent) {
+          Result::Err(e) => Result::Err(@output.storage_error(e))
+          Result::Ok(_) =>
+            match ctx.mode {
+              OutputMode::Text => {
+                println("Created: " + id)
+                Result::Ok(())
+              }
+              OutputMode::Json => print_stored_issue(storage, id)
+            }
         }
     }
   })
@@ -141,6 +220,7 @@ fn handle_list_command(ctx : Context) -> Int32 {
     excludes: true,
     fields: true,
     brief: false,
+    include_deferred: false,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)
@@ -194,6 +274,7 @@ fn handle_show_command(ctx : Context) -> Int32 {
     excludes: false,
     fields: false,
     brief: false,
+    include_deferred: false,
   })
   match options.error {
     Option::Some(error) => return fail(ctx, error)
@@ -216,12 +297,9 @@ fn handle_show_command(ctx : Context) -> Int32 {
 
     match ctx.mode {
       OutputMode::Json => {
-        let rows : Array[Json] = []
-        for issue in issues {
-          Array::push(
-            rows,
-            @output.issue_json(issue, @output.default_fields(), None),
-          )
+        let rows = match issue_rows(storage, issues, @output.default_fields()) {
+          Result::Ok(rows) => rows
+          Result::Err(error) => return Result::Err(error)
         }
         emit_json(Json::array(rows))
       }
@@ -232,7 +310,11 @@ fn handle_show_command(ctx : Context) -> Int32 {
             println("")
           }
           first = false
-          print_issue_detail(issue)
+          let parent = match @lib.get_parent_id(storage, issue.id) {
+            Result::Ok(parent) => parent
+            Result::Err(e) => return Result::Err(@output.storage_error(e))
+          }
+          print_issue_detail(issue, parent)
         }
       }
     }
@@ -246,7 +328,7 @@ fn handle_update_command(ctx : Context) -> Int32 {
     return fail(
       ctx,
       required_field(
-        "issue ID is required", "bm update <id> [--title TITLE] [--priority N]",
+        "issue ID is required", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF] [--parent ID]",
       ),
     )
   }
@@ -254,23 +336,69 @@ fn handle_update_command(ctx : Context) -> Int32 {
   let id = ctx.args[2]
   let mut new_title : String? = Option::None
   let mut new_priority : Int32? = Option::None
+  let mut new_estimate : Int32? = Option::None
+  let mut estimate_given = false
+  let mut new_due_date : Int32? = Option::None
+  let mut due_date_given = false
+  let mut new_defer_until : Int32? = Option::None
+  let mut defer_until_given = false
+  let mut new_external_ref : String? = Option::None
+  let mut external_ref_given = false
+  let mut new_parent : String? = Option::None
+  let mut parent_given = false
 
   let mut index = 3
   while index < ctx.args.length() {
     let arg = ctx.args[index]
-    if arg == "--title" || arg == "--priority" {
+    if arg == "--title" ||
+      arg == "--priority" ||
+      arg == "--estimate" ||
+      arg == "--due" ||
+      arg == "--defer" ||
+      arg == "--external-ref" ||
+      arg == "--parent" {
       if index + 1 >= ctx.args.length() {
         return fail(ctx, missing_value_error(arg))
       }
       let value = ctx.args[index + 1]
       if arg == "--title" {
         new_title = Option::Some(value)
-      } else {
+      } else if arg == "--priority" {
         match @lib.parse_priority(value) {
           Result::Ok(parsed) => new_priority = Option::Some(parsed)
           Result::Err(e) =>
             return fail(ctx, invalid_value_error("INVALID_PRIORITY", e))
         }
+      } else if arg == "--estimate" {
+        match estimate_from_flag(value) {
+          Result::Ok(parsed) => {
+            new_estimate = parsed
+            estimate_given = true
+          }
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--due" {
+        match optional_date_from_flag(value) {
+          Result::Ok(parsed) => {
+            new_due_date = parsed
+            due_date_given = true
+          }
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--defer" {
+        match optional_date_from_flag(value) {
+          Result::Ok(parsed) => {
+            new_defer_until = parsed
+            defer_until_given = true
+          }
+          Result::Err(e) => return fail(ctx, e)
+        }
+      } else if arg == "--parent" {
+        new_parent = ref_from_flag(value)
+        parent_given = true
+      } else {
+        new_external_ref = ref_from_flag(value)
+        external_ref_given = true
       }
       index += 2
     } else if is_flag(arg) {
@@ -280,11 +408,17 @@ fn handle_update_command(ctx : Context) -> Int32 {
     }
   }
 
-  if new_title is None && new_priority is None {
+  if !estimate_given &&
+    !due_date_given &&
+    !defer_until_given &&
+    !external_ref_given &&
+    !parent_given &&
+    new_title is None &&
+    new_priority is None {
     return fail(
       ctx,
       required_field(
-        "no updates specified", "bm update <id> [--title TITLE] [--priority N]",
+        "no updates specified", "bm update <id> [--title TITLE] [--priority N] [--estimate MINUTES] [--due DATE] [--defer DATE] [--external-ref REF] [--parent ID]",
       ),
     )
   }
@@ -314,6 +448,61 @@ fn handle_update_command(ctx : Context) -> Int32 {
           Result::Err(e) => return Result::Err(@output.storage_error(e))
         }
       Option::None => ()
+    }
+
+    if estimate_given {
+      match @lib.update_issue_estimate(storage, id, new_estimate) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated estimate")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if due_date_given {
+      match @lib.update_issue_due_date(storage, id, new_due_date) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated due date")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if defer_until_given {
+      match @lib.update_issue_defer_until(storage, id, new_defer_until) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated defer date")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if parent_given {
+      match @lib.set_parent(storage, id, new_parent) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated parent")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
+    }
+
+    if external_ref_given {
+      match @lib.update_issue_external_ref(storage, id, new_external_ref) {
+        Result::Ok(_) =>
+          match ctx.mode {
+            OutputMode::Text => println("Updated external reference")
+            OutputMode::Json => ()
+          }
+        Result::Err(e) => return Result::Err(@output.storage_error(e))
+      }
     }
 
     match ctx.mode {
@@ -360,17 +549,75 @@ fn handle_sync_command(ctx : Context) -> Int32 {
 ///|
 fn handle_defer_command(ctx : Context) -> Int32 {
   if ctx.args.length() < 3 {
-    return fail(ctx, required_field("issue ID is required", "bm defer <id>"))
+    return fail(
+      ctx,
+      required_field("issue ID is required", "bm defer <id> [--until DATE]"),
+    )
+  }
+
+  let id = ctx.args[2]
+  let mut until : Int32? = Option::None
+  let mut until_given = false
+
+  let mut index = 3
+  while index < ctx.args.length() {
+    let arg = ctx.args[index]
+    if arg == "--until" {
+      if index + 1 >= ctx.args.length() {
+        return fail(ctx, missing_value_error(arg))
+      }
+      match optional_date_from_flag(ctx.args[index + 1]) {
+        Result::Ok(parsed) => {
+          until = parsed
+          until_given = true
+        }
+        Result::Err(e) => return fail(ctx, e)
+      }
+      index += 2
+    } else if is_flag(arg) {
+      return fail(ctx, unknown_option_error(arg))
+    } else {
+      index += 1
+    }
+  }
+
+  with_storage(ctx, fn(storage) {
+    match @lib.defer_issue(storage, id) {
+      Result::Err(e) => Result::Err(@output.storage_error(e))
+      Result::Ok(_) => {
+        if until_given {
+          match @lib.update_issue_defer_until(storage, id, until) {
+            Result::Err(e) => return Result::Err(@output.storage_error(e))
+            Result::Ok(_) => ()
+          }
+        }
+        match ctx.mode {
+          OutputMode::Text => {
+            println("Deferred: " + id)
+            Result::Ok(())
+          }
+          OutputMode::Json => print_stored_issue(storage, id)
+        }
+      }
+    }
+  })
+}
+
+///|
+/// Clear the `defer_until` gate and put a deferred issue back to open.
+fn handle_undefer_command(ctx : Context) -> Int32 {
+  if ctx.args.length() < 3 {
+    return fail(ctx, required_field("issue ID is required", "bm undefer <id>"))
   }
 
   let id = ctx.args[2]
   with_storage(ctx, fn(storage) {
-    match @lib.defer_issue(storage, id) {
+    match @lib.undefer_issue(storage, id) {
       Result::Err(e) => Result::Err(@output.storage_error(e))
       Result::Ok(_) =>
         match ctx.mode {
           OutputMode::Text => {
-            println("Deferred: " + id)
+            println("Undeferred: " + id)
             Result::Ok(())
           }
           OutputMode::Json => print_stored_issue(storage, id)

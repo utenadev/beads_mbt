@@ -23,6 +23,33 @@ fn col_int(stmt : @sqlite3.Statement, index : Int32) -> Int32 {
 }
 
 ///|
+/// Read a column as a dynamically typed value, so SQL NULL stays
+/// distinguishable from `0` and `""`.
+fn col_value(stmt : @sqlite3.Statement, index : Int32) -> @sqlite3.Value {
+  stmt.column(index~) catch {
+    _ => @sqlite3.Value::Null
+  }
+}
+
+///|
+/// Read a nullable TEXT column. Returns None for SQL NULL.
+fn col_optional_string(stmt : @sqlite3.Statement, index : Int32) -> String? {
+  match col_value(stmt, index) {
+    @sqlite3.Value::Text(value) => Option::Some(value)
+    _ => Option::None
+  }
+}
+
+///|
+/// Read a nullable INTEGER column. Returns None for SQL NULL.
+fn col_optional_int(stmt : @sqlite3.Statement, index : Int32) -> Int32? {
+  match col_value(stmt, index) {
+    @sqlite3.Value::Integer(value) => Option::Some(value.to_int())
+    _ => Option::None
+  }
+}
+
+///|
 /// Read one issue row from the current cursor position of `stmt`.
 /// The SELECT must list `issue_columns` in the canonical order.
 fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
@@ -39,6 +66,10 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
   let is_ephemeral : Int32 = col_int(stmt, 10)
   let acceptance_criteria = col_string(stmt, 11)
   let prerequisites = col_string(stmt, 12)
+  let external_ref = col_optional_string(stmt, 13)
+  let estimate = col_optional_int(stmt, 14)
+  let due_date = col_optional_int(stmt, 15)
+  let defer_until = col_optional_int(stmt, 16)
 
   Issue::{
     id,
@@ -71,6 +102,10 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
     } else {
       Option::Some(prerequisites)
     },
+    external_ref,
+    estimate,
+    due_date,
+    defer_until,
     created_at,
     updated_at,
     is_ephemeral: is_ephemeral == 1,
@@ -81,13 +116,14 @@ fn read_issue_row(stmt : @sqlite3.Statement) -> Issue {
 /// The columns of the canonical issue SELECT, in the order `read_issue_row`
 /// reads them. Every issue query spells these out so a new column only has to
 /// be added in one place.
-let issue_columns : String = "id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites"
+let issue_columns : String = "id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites, external_ref, estimate, due_date, defer_until"
 
 ///|
 /// A value that can be bound to a statement parameter.
 priv enum SqlParam {
   Text(String)
   Int(Int32)
+  Null
 }
 
 ///|
@@ -112,6 +148,10 @@ fn exec_write(
         stmt.bind(index~, value) catch {
           _ => return Result::Err("bind failed")
         }
+      SqlParam::Null =>
+        stmt.bind(index~, @sqlite3.Value::Null) catch {
+          _ => return Result::Err("bind failed")
+        }
     }
     index += 1
   }
@@ -121,6 +161,24 @@ fn exec_write(
     _ => return Result::Err("finalize failed")
   }
   Result::Ok(())
+}
+
+///|
+/// Bind an optional TEXT value as SQL NULL when it is missing.
+fn optional_text_param(value : String?) -> SqlParam {
+  match value {
+    Option::Some(text) => SqlParam::Text(text)
+    Option::None => SqlParam::Null
+  }
+}
+
+///|
+/// Bind an optional INTEGER value as SQL NULL when it is missing.
+fn optional_int_param(value : Int32?) -> SqlParam {
+  match value {
+    Option::Some(number) => SqlParam::Int(number)
+    Option::None => SqlParam::Null
+  }
 }
 
 ///|
@@ -317,10 +375,10 @@ fn query_one_string(
 /// Schema statements. Safe to run repeatedly (all use IF NOT EXISTS).
 let schema_statements : Array[String] = [
   "CREATE TABLE IF NOT EXISTS config (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
-  "CREATE TABLE IF NOT EXISTS issues (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'other', priority INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'open', description TEXT, assignee TEXT, owner TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, closed_at INTEGER, closed_reason TEXT, parent TEXT, estimate INTEGER, due_date INTEGER, external_ref TEXT, is_ephemeral INTEGER NOT NULL DEFAULT 0, acceptance_criteria TEXT, prerequisites TEXT);",
+  "CREATE TABLE IF NOT EXISTS issues (id TEXT PRIMARY KEY, title TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'other', priority INTEGER NOT NULL DEFAULT 2, status TEXT NOT NULL DEFAULT 'open', description TEXT, assignee TEXT, owner TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, closed_at INTEGER, closed_reason TEXT, parent TEXT, estimate INTEGER, due_date INTEGER, external_ref TEXT, is_ephemeral INTEGER NOT NULL DEFAULT 0, acceptance_criteria TEXT, prerequisites TEXT, defer_until INTEGER);",
   "CREATE TABLE IF NOT EXISTS issue_labels (issue_id TEXT NOT NULL, label TEXT NOT NULL, PRIMARY KEY (issue_id, label), FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE);",
   "CREATE TABLE IF NOT EXISTS issue_dependencies (issue_id TEXT NOT NULL, depends_on TEXT NOT NULL, type TEXT NOT NULL DEFAULT 'blocks', PRIMARY KEY (issue_id, depends_on, type), FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE, FOREIGN KEY (depends_on) REFERENCES issues(id) ON DELETE CASCADE);",
-  "CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, issue_id TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE);",
+  "CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT, issue_id TEXT NOT NULL, body TEXT NOT NULL, author TEXT NOT NULL DEFAULT 'bm', created_at INTEGER NOT NULL, FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE CASCADE);",
   "CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);", "CREATE INDEX IF NOT EXISTS idx_issues_priority ON issues(priority);",
   "CREATE INDEX IF NOT EXISTS idx_issues_created_at ON issues(created_at);",
 ]
@@ -330,7 +388,7 @@ let schema_statements : Array[String] = [
 /// 1 - typed dependencies: `issue_dependencies.type` is part of the key.
 /// 2 - planning columns: `issues.acceptance_criteria` and
 ///     `issues.prerequisites` hold the plans `bm show` renders.
-let schema_version : Int32 = 2
+let schema_version : Int32 = 3
 
 ///|
 /// Execute a statement that takes no parameters.
@@ -424,17 +482,47 @@ fn migrate_schema(conn : @sqlite3.Connection) -> Result[Unit, String] {
     }
   }
 
-  for column in ["acceptance_criteria", "prerequisites"] {
+  for
+    column in [
+      "acceptance_criteria", "prerequisites", "external_ref", "estimate", "due_date",
+      "defer_until",
+    ] {
     let present = match column_exists(conn, "issues", column) {
       Result::Ok(v) => v
       Result::Err(e) => return Result::Err(e)
     }
     if !present {
+      let column_type = if column == "estimate" ||
+        column == "due_date" ||
+        column == "defer_until" {
+        "INTEGER"
+      } else {
+        "TEXT"
+      }
       match
-        exec_sql(conn, "ALTER TABLE issues ADD COLUMN " + column + " TEXT;") {
+        exec_sql(
+          conn,
+          "ALTER TABLE issues ADD COLUMN " + column + " " + column_type + ";",
+        ) {
         Result::Ok(_) => ()
         Result::Err(e) => return Result::Err(e)
       }
+    }
+  }
+
+  // Comments gained an author in version 3; older rows fall back to the
+  // default the column declares.
+  let comments_have_author = match column_exists(conn, "comments", "author") {
+    Result::Ok(v) => v
+    Result::Err(e) => return Result::Err(e)
+  }
+  if !comments_have_author {
+    match
+      exec_sql(
+        conn, "ALTER TABLE comments ADD COLUMN author TEXT NOT NULL DEFAULT 'bm';",
+      ) {
+      Result::Ok(_) => ()
+      Result::Err(e) => return Result::Err(e)
     }
   }
 
@@ -531,7 +619,7 @@ pub fn insert_issue(
 
   exec_write(
     storage,
-    "INSERT INTO issues (id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+    "INSERT INTO issues (id, title, type, priority, status, description, assignee, owner, created_at, updated_at, is_ephemeral, acceptance_criteria, prerequisites, external_ref, estimate, due_date, defer_until) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
     [
       SqlParam::Text(issue.id),
       SqlParam::Text(issue.title),
@@ -546,6 +634,10 @@ pub fn insert_issue(
       SqlParam::Int(if issue.is_ephemeral { 1 } else { 0 }),
       SqlParam::Text(acceptance_criteria),
       SqlParam::Text(prerequisites),
+      optional_text_param(issue.external_ref),
+      optional_int_param(issue.estimate),
+      optional_int_param(issue.due_date),
+      optional_int_param(issue.defer_until),
     ],
   )
 }
@@ -592,15 +684,24 @@ pub fn update_issue_status(
 ///|
 /// Get ready issues: open issues that no blocking dependency holds back.
 /// Ordered like beads_rust (priority, then newest, then id).
-pub fn get_ready_issues(storage : BeadsStorage) -> Result[Array[Issue], String] {
-  let open_issues = match
-    query_issues(
-      storage,
-      "SELECT " +
-      issue_columns +
-      " FROM issues WHERE status = 'open' ORDER BY priority ASC, created_at DESC, id ASC;",
-      Option::None,
-    ) {
+pub fn get_ready_issues(
+  storage : BeadsStorage,
+  include_deferred~ : Bool = false,
+) -> Result[Array[Issue], String] {
+  // A future `defer_until` hides an issue even when its status is `open`:
+  // the gate is compared at query time, so no scheduled job has to reopen it.
+  // `include_deferred` asks for the gated backlog too and drops both the gate
+  // and the status restriction that keeps `deferred` issues out.
+  let sql = if include_deferred {
+    "SELECT " +
+    issue_columns +
+    " FROM issues WHERE status IN ('open', 'deferred') ORDER BY priority ASC, created_at DESC, id ASC;"
+  } else {
+    "SELECT " +
+    issue_columns +
+    " FROM issues WHERE status = 'open' AND (defer_until IS NULL OR defer_until <= CAST(strftime('%s', 'now') AS INTEGER)) ORDER BY priority ASC, created_at DESC, id ASC;"
+  }
+  let open_issues = match query_issues(storage, sql, Option::None) {
     Result::Ok(issues) => issues
     Result::Err(e) => return Result::Err(e)
   }
@@ -807,9 +908,81 @@ pub fn update_issue_priority(
 }
 
 ///|
+/// Update issue external reference, or clear it when `external_ref` is None.
+pub fn update_issue_external_ref(
+  storage : BeadsStorage,
+  id : String,
+  external_ref : String?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET external_ref = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_text_param(external_ref), SqlParam::Text(id)],
+  )
+}
+
+///|
+/// Update the estimate in minutes, or clear it when `estimate` is None.
+pub fn update_issue_estimate(
+  storage : BeadsStorage,
+  id : String,
+  estimate : Int32?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET estimate = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_int_param(estimate), SqlParam::Text(id)],
+  )
+}
+
+///|
+/// Update the due date (Unix seconds), or clear it when `due_date` is None.
+pub fn update_issue_due_date(
+  storage : BeadsStorage,
+  id : String,
+  due_date : Int32?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET due_date = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_int_param(due_date), SqlParam::Text(id)],
+  )
+}
+
+///|
+/// Update the `bm ready` time gate (Unix seconds), or clear it when
+/// `defer_until` is None.
+pub fn update_issue_defer_until(
+  storage : BeadsStorage,
+  id : String,
+  defer_until : Int32?,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET defer_until = ?, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [optional_int_param(defer_until), SqlParam::Text(id)],
+  )
+}
+
+///|
 /// Defer an issue (set status to deferred)
 pub fn defer_issue(storage : BeadsStorage, id : String) -> Result[Unit, String] {
   update_issue_status(storage, id, "deferred")
+}
+
+///|
+/// Undefer an issue: clear the time gate and, when the status is `deferred`,
+/// put the issue back to `open`. Any other status is left alone, like
+/// beads_rust.
+pub fn undefer_issue(
+  storage : BeadsStorage,
+  id : String,
+) -> Result[Unit, String] {
+  exec_write(
+    storage,
+    "UPDATE issues SET defer_until = NULL, status = CASE WHEN status = 'deferred' THEN 'open' ELSE status END, updated_at = strftime('%s', 'now') WHERE id = ?;",
+    [SqlParam::Text(id)],
+  )
 }
 
 // ============================================================================
@@ -848,6 +1021,51 @@ pub fn remove_dependency(
     "DELETE FROM issue_dependencies WHERE issue_id = ? AND depends_on = ?;",
     [SqlParam::Text(issue), SqlParam::Text(depends_on)],
   )
+}
+
+///|
+/// The parent of `child`: the target of its `parent-child` edge, if any.
+pub fn get_parent_id(
+  storage : BeadsStorage,
+  child : String,
+) -> Result[String?, String] {
+  let rows = match
+    query_strings(
+      storage,
+      "SELECT depends_on FROM issue_dependencies WHERE issue_id = ? AND type = 'parent-child' LIMIT 1;",
+      Option::Some(child),
+    ) {
+    Result::Ok(rows) => rows
+    Result::Err(e) => return Result::Err(e)
+  }
+  match rows.get(0) {
+    Option::Some(id) => Result::Ok(Option::Some(id))
+    Option::None => Result::Ok(Option::None)
+  }
+}
+
+///|
+/// Set the parent of `child` with a `parent-child` dependency edge, replacing
+/// any existing parent. `None` removes the edge, like `bm update --parent ""`.
+pub fn set_parent(
+  storage : BeadsStorage,
+  child : String,
+  parent : String?,
+) -> Result[Unit, String] {
+  match
+    exec_write(
+      storage,
+      "DELETE FROM issue_dependencies WHERE issue_id = ? AND type = 'parent-child';",
+      [SqlParam::Text(child)],
+    ) {
+    Result::Err(e) => return Result::Err(e)
+    Result::Ok(_) => ()
+  }
+  match parent {
+    Option::Some(parent_id) =>
+      add_dependency(storage, child, parent_id, "parent-child")
+    Option::None => Result::Ok(())
+  }
 }
 
 ///|
@@ -968,6 +1186,7 @@ pub(all) struct IssueFacts {
   labels : Array[String]
   dependency_count : Int32
   dependent_count : Int32
+  parent_id : String?
 }
 
 ///|
@@ -997,6 +1216,7 @@ pub fn load_issue_facts(
 
   let dependency_counts : Map[String, Int32] = Map([])
   let dependent_counts : Map[String, Int32] = Map([])
+  let parents : Map[String, String] = Map([])
   let edges = match get_all_dependencies(storage) {
     Result::Ok(edges) => edges
     Result::Err(e) => return Result::Err(e)
@@ -1013,6 +1233,9 @@ pub fn load_issue_facts(
       Option::None => 0
     }
     dependent_counts.set(edge.depends_on, dependents + 1)
+    if edge.type_ == "parent-child" {
+      parents.set(edge.issue_id, edge.depends_on)
+    }
   }
 
   let facts : Map[String, IssueFacts] = Map([])
@@ -1030,6 +1253,7 @@ pub fn load_issue_facts(
         Option::Some(count) => count
         Option::None => 0
       },
+      parent_id: parents.get(issue.id),
     })
   }
   Result::Ok(facts)
@@ -1178,38 +1402,84 @@ fn contains_ignoring_case(haystack : String, needle : String) -> Bool {
 // ============================================================================
 
 ///|
-/// Add a comment to an issue
+/// A comment on an issue.
+pub(all) struct IssueComment {
+  id : Int32
+  issue_id : String
+  author : String
+  body : String
+  created_at : Int32
+}
+
+///|
+/// The rowid of the last successful INSERT on this connection.
+fn last_insert_id(storage : BeadsStorage) -> Int32 {
+  let stmt = storage.conn.prepare("SELECT last_insert_rowid();") catch {
+    _ => return 0
+  }
+  let id = if (stmt.step() catch { _ => false }) { col_int(stmt, 0) } else { 0 }
+  stmt.finalize() catch {
+    _ => ()
+  }
+  id
+}
+
+///|
+/// Add a comment to an issue. `author` defaults to `bm`, the value the column
+/// declares for rows written before authors existed.
 pub fn add_comment(
   storage : BeadsStorage,
   issue : String,
   body : String,
+  author~ : String = "bm",
 ) -> Result[Int32, String] {
   let created_at = current_timestamp()
   let result = exec_write(
     storage,
-    "INSERT INTO comments (issue_id, body, created_at) VALUES (?, ?, ?);",
-    [SqlParam::Text(issue), SqlParam::Text(body), SqlParam::Int(created_at)],
+    "INSERT INTO comments (issue_id, body, author, created_at) VALUES (?, ?, ?, ?);",
+    [
+      SqlParam::Text(issue),
+      SqlParam::Text(body),
+      SqlParam::Text(author),
+      SqlParam::Int(created_at),
+    ],
   )
   match result {
     Result::Ok(_) => ()
     Result::Err(e) => return Result::Err(e)
   }
-
-  // Get the last inserted ID (simplified - in real impl would use last_insert_rowid)
-  Result::Ok(0)
+  Result::Ok(last_insert_id(storage))
 }
 
 ///|
-/// Get comments for an issue
+/// Get comments for an issue, oldest first
 pub fn get_comments(
   storage : BeadsStorage,
   issue : String,
-) -> Result[Array[String], String] {
-  query_strings(
-    storage,
-    "SELECT body FROM comments WHERE issue_id = ? ORDER BY created_at ASC;",
-    Option::Some(issue),
-  )
+) -> Result[Array[IssueComment], String] {
+  let sql = "SELECT id, issue_id, author, body, created_at FROM comments WHERE issue_id = ? ORDER BY created_at ASC, id ASC;"
+  let stmt = storage.conn.prepare(sql) catch {
+    _ => return Result::Err("prepare failed")
+  }
+  stmt.bind(index=1, issue) catch {
+    _ => return Result::Err("bind failed")
+  }
+
+  let comments : Array[IssueComment] = []
+  while (stmt.step() catch { _ => return Result::Err("step failed") }) {
+    Array::push(comments, IssueComment::{
+      id: col_int(stmt, 0),
+      issue_id: col_string(stmt, 1),
+      author: col_string(stmt, 2),
+      body: col_string(stmt, 3),
+      created_at: col_int(stmt, 4),
+    })
+  }
+
+  stmt.finalize() catch {
+    _ => return Result::Err("finalize failed")
+  }
+  Result::Ok(comments)
 }
 
 ///|

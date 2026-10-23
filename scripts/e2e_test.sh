@@ -247,6 +247,92 @@ test_defer() {
     fi
 }
 
+test_defer_gate() {
+    test_start "Test: --defer gates bm ready until the date"
+
+    gated=$(run_cmd create "Gated work" --defer +1d | sed 's/Created: //')
+    elapsed=$(run_cmd create "Elapsed gate" --defer 2020-01-01 | sed 's/Created: //')
+    if [ -z "$gated" ] || [ -z "$elapsed" ]; then
+        test_fail "create with --defer should return issue ids"
+        return
+    fi
+
+    ready_output=$(run_cmd ready)
+    if echo "$ready_output" | grep -q "$gated"; then
+        test_fail "a future --defer should keep the issue out of ready"
+        echo "Output: $ready_output"
+        return
+    fi
+    if ! echo "$ready_output" | grep -q "$elapsed"; then
+        test_fail "an elapsed --defer should not hide the issue"
+        return
+    fi
+    if ! run_cmd ready --include-deferred | grep -q "$gated"; then
+        test_fail "ready --include-deferred should reveal the gated issue"
+        return
+    fi
+    if ! run_cmd show "$gated" | grep -q "Deferred until:"; then
+        test_fail "show should print the defer date"
+        return
+    fi
+
+    # an empty --defer clears the gate
+    run_cmd update "$gated" --defer "" > /dev/null
+    if ! run_cmd ready | grep -q "$gated"; then
+        test_fail "an empty --defer should clear the gate"
+        return
+    fi
+
+    # defer --until sets both the status and the gate, undefer undoes both
+    run_cmd defer "$elapsed" --until +7d > /dev/null
+    if run_cmd ready | grep -q "$elapsed"; then
+        test_fail "defer --until should set the deferred status"
+        return
+    fi
+    if ! run_cmd undefer "$elapsed" | grep -q "Undeferred:"; then
+        test_fail "undefer should report the change"
+        return
+    fi
+    if ! run_cmd ready | grep -q "$elapsed"; then
+        test_fail "undefer should clear the gate and reopen the issue"
+        return
+    fi
+
+    test_pass "defer gate, --include-deferred, and undefer work end to end"
+}
+
+test_comments_author() {
+    test_start "Test: comments add --author"
+
+    issue=$(run_cmd create "Commented work" | sed 's/Created: //')
+    if [ -z "$issue" ]; then
+        test_fail "create should return an issue id"
+        return
+    fi
+
+    run_cmd comments add "$issue" "hello" --author alice > /dev/null
+    text=$(run_cmd comments list "$issue")
+    if ! echo "$text" | grep -q "\[alice\] hello"; then
+        test_fail "comments list should print the author"
+        echo "Output: $text"
+        return
+    fi
+
+    json=$(run_cmd_stdout comments list "$issue" --json)
+    if ! echo "$json" | grep -q '"author":"alice"'; then
+        test_fail "comments list --json should write the author"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"text":"hello"'; then
+        test_fail "comments list --json should write text, not body"
+        echo "Output: $json"
+        return
+    fi
+
+    test_pass "comments carry the author in text and JSON output"
+}
+
 test_create_flags() {
     test_start "Test: create with --priority and --type"
 
@@ -283,6 +369,143 @@ test_create_flags_reject_invalid() {
     fi
 
     test_pass "create rejects invalid --priority and --type"
+}
+
+test_parent_flag() {
+    test_start "Test: create/update --parent"
+
+    parent=$(run_cmd create "Parent work" | sed 's/Created: //')
+    child=$(run_cmd create "Child work" --parent "$parent" | sed 's/Created: //')
+    if [ -z "$child" ]; then
+        test_fail "create --parent should return an issue id"
+        return
+    fi
+
+    if ! run_cmd show "$child" | grep -q "Parent: $parent"; then
+        test_fail "show should print the parent"
+        run_cmd show "$child"
+        return
+    fi
+    json=$(run_cmd_stdout show "$child" --json)
+    if ! echo "$json" | grep -q "\"parent_id\":\"$parent\""; then
+        test_fail "show --json should write parent_id"
+        echo "Output: $json"
+        return
+    fi
+
+    # a blocked parent keeps its child out of ready
+    blocker=$(run_cmd create "Parent blocker" | sed 's/Created: //')
+    run_cmd dep add "$parent" "$blocker" > /dev/null
+    if ! run_cmd blocked | grep -q "$child"; then
+        test_fail "the child should inherit the parent's blocker"
+        return
+    fi
+
+    # an empty --parent clears the edge and the inherited block
+    run_cmd update "$child" --parent "" > /dev/null
+    if run_cmd show "$child" | grep -q "Parent:"; then
+        test_fail "an empty --parent should clear the parent"
+        return
+    fi
+    if run_cmd blocked | grep -q "$child"; then
+        test_fail "clearing the parent should drop the inherited block"
+        return
+    fi
+
+    test_pass "parent edges are created, shown, inherited, and cleared"
+}
+
+test_scheduling_flags() {
+    test_start "Test: create/update --estimate, --due, --external-ref"
+
+    issue=$(run_cmd create "Scheduled work" --estimate 90 --due 2026-09-11 --external-ref gh-123 | sed 's/Created: //')
+    if [ -z "$issue" ]; then
+        test_fail "create with scheduling flags should return an issue id"
+        return
+    fi
+
+    detail=$(run_cmd show "$issue")
+    if ! echo "$detail" | grep -q "External Ref: gh-123"; then
+        test_fail "show should print the external reference"
+        echo "Output: $detail"
+        return
+    fi
+    if ! echo "$detail" | grep -q "Estimate: 90m"; then
+        test_fail "show should print the estimate"
+        echo "Output: $detail"
+        return
+    fi
+    if ! echo "$detail" | grep -q "Due: 2026-09-11"; then
+        test_fail "show should print the due date"
+        echo "Output: $detail"
+        return
+    fi
+
+    json=$(run_cmd_stdout show "$issue" --json)
+    if ! echo "$json" | grep -q '"external_ref":"gh-123"'; then
+        test_fail "show --json should write external_ref"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"estimated_minutes":90'; then
+        test_fail "show --json should write estimated_minutes"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"due_at":1789117200'; then
+        test_fail "show --json should write due_at"
+        echo "Output: $json"
+        return
+    fi
+
+    # update replaces the values, and an empty value clears the field
+    run_cmd update "$issue" --estimate 30 --due +2d --external-ref gh-456 > /dev/null
+    json=$(run_cmd_stdout show "$issue" --json)
+    if ! echo "$json" | grep -q '"estimated_minutes":30'; then
+        test_fail "update should replace the estimate"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"external_ref":"gh-456"'; then
+        test_fail "update should replace the external reference"
+        echo "Output: $json"
+        return
+    fi
+
+    run_cmd update "$issue" --estimate "" --due "" --external-ref "" > /dev/null
+    json=$(run_cmd_stdout show "$issue" --json)
+    if ! echo "$json" | grep -q '"external_ref":null'; then
+        test_fail "an empty --external-ref should clear the field"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"due_at":null'; then
+        test_fail "an empty --due should clear the field"
+        echo "Output: $json"
+        return
+    fi
+    if ! echo "$json" | grep -q '"estimated_minutes":null'; then
+        test_fail "an empty --estimate should clear the field"
+        echo "Output: $json"
+        return
+    fi
+
+    test_pass "scheduling flags round-trip through create, show, and update"
+}
+
+test_scheduling_flags_reject_invalid() {
+    test_start "Test: scheduling flags reject invalid values"
+
+    if ! run_cmd create "Bad date" --due nonsense | grep -q "invalid date"; then
+        test_fail "create should reject --due nonsense"
+        return
+    fi
+    if ! run_cmd create "Bad estimate" --estimate abc | grep -q "invalid number"; then
+        test_fail "create should reject --estimate abc"
+        return
+    fi
+
+    test_pass "create rejects invalid --due and --estimate values"
 }
 
 test_ready_skips_blocked() {
@@ -631,8 +854,13 @@ main() {
     test_close
     test_ready
     test_defer
+    test_defer_gate
+    test_comments_author
     test_create_flags
     test_create_flags_reject_invalid
+    test_scheduling_flags
+    test_scheduling_flags_reject_invalid
+    test_parent_flag
     test_ready_skips_blocked
     test_search
     test_json_list
