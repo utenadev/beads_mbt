@@ -9,7 +9,8 @@
 let supported_fields : Array[String] = [
   "id", "title", "description", "status", "priority", "issue_type", "assignee", "owner",
   "acceptance_criteria", "prerequisites", "external_ref", "estimated_minutes", "due_at",
-  "defer_until", "created_at", "updated_at", "labels", "dependency_count", "dependent_count",
+  "defer_until", "parent_id", "created_at", "updated_at", "labels", "dependency_count",
+  "dependent_count",
 ]
 
 ///|
@@ -24,7 +25,8 @@ pub fn supported_fields_text() -> String {
 pub fn needs_issue_facts(fields : Array[String]) -> Bool {
   fields.contains("labels") ||
   fields.contains("dependency_count") ||
-  fields.contains("dependent_count")
+  fields.contains("dependent_count") ||
+  fields.contains("parent_id")
 }
 
 ///|

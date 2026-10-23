@@ -2,8 +2,8 @@
 
 ///|
 /// The projection used when no `--fields` is given: every column of the issue
-/// row. Labels and dependency counts are left out because they need extra
-/// queries, and `--fields` asks for them explicitly.
+/// row plus `parent_id`. Labels and dependency counts are left out because
+/// they need extra queries, and `--fields` asks for them explicitly.
 pub fn default_fields() -> Array[String] {
   let fields : Array[String] = []
   for field in supported_fields {
@@ -77,6 +77,13 @@ fn issue_field_json(
     "estimated_minutes" => optional_int_json(issue.estimate)
     "due_at" => optional_int_json(issue.due_date)
     "defer_until" => optional_int_json(issue.defer_until)
+    "parent_id" =>
+      optional_json(
+        match facts {
+          Option::Some(facts) => facts.parent_id
+          Option::None => Option::None
+        },
+      )
     "created_at" => Json::number(issue.created_at.to_double())
     "updated_at" => Json::number(issue.updated_at.to_double())
     "labels" =>

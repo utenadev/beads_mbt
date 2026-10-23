@@ -178,12 +178,16 @@ fn format_issue_line(issue : @lib.Issue) -> String {
 ///|
 /// Print one issue block: the identifying fields, then whichever free-text
 /// planning sections the issue carries.
-fn print_issue_detail(issue : @lib.Issue) -> Unit {
+fn print_issue_detail(issue : @lib.Issue, parent : String?) -> Unit {
   println("Issue: " + issue.id)
   println("Title: " + issue.title)
   println("Status: " + @lib.status_to_string(issue.status))
   println("Priority: P" + issue.priority.to_string())
   println("Type: " + @lib.issue_type_to_string(issue.type_))
+  match parent {
+    Option::Some(id) => println("Parent: " + id)
+    Option::None => ()
+  }
   match issue.external_ref {
     Option::Some(text) => println("External Ref: " + text)
     Option::None => ()

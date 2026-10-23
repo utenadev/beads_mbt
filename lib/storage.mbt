@@ -1024,6 +1024,51 @@ pub fn remove_dependency(
 }
 
 ///|
+/// The parent of `child`: the target of its `parent-child` edge, if any.
+pub fn get_parent_id(
+  storage : BeadsStorage,
+  child : String,
+) -> Result[String?, String] {
+  let rows = match
+    query_strings(
+      storage,
+      "SELECT depends_on FROM issue_dependencies WHERE issue_id = ? AND type = 'parent-child' LIMIT 1;",
+      Option::Some(child),
+    ) {
+    Result::Ok(rows) => rows
+    Result::Err(e) => return Result::Err(e)
+  }
+  match rows.get(0) {
+    Option::Some(id) => Result::Ok(Option::Some(id))
+    Option::None => Result::Ok(Option::None)
+  }
+}
+
+///|
+/// Set the parent of `child` with a `parent-child` dependency edge, replacing
+/// any existing parent. `None` removes the edge, like `bm update --parent ""`.
+pub fn set_parent(
+  storage : BeadsStorage,
+  child : String,
+  parent : String?,
+) -> Result[Unit, String] {
+  match
+    exec_write(
+      storage,
+      "DELETE FROM issue_dependencies WHERE issue_id = ? AND type = 'parent-child';",
+      [SqlParam::Text(child)],
+    ) {
+    Result::Err(e) => return Result::Err(e)
+    Result::Ok(_) => ()
+  }
+  match parent {
+    Option::Some(parent_id) =>
+      add_dependency(storage, child, parent_id, "parent-child")
+    Option::None => Result::Ok(())
+  }
+}
+
+///|
 /// Get dependencies for an issue (what this issue depends on)
 pub fn get_dependencies(
   storage : BeadsStorage,
@@ -1141,6 +1186,7 @@ pub(all) struct IssueFacts {
   labels : Array[String]
   dependency_count : Int32
   dependent_count : Int32
+  parent_id : String?
 }
 
 ///|
@@ -1170,6 +1216,7 @@ pub fn load_issue_facts(
 
   let dependency_counts : Map[String, Int32] = Map([])
   let dependent_counts : Map[String, Int32] = Map([])
+  let parents : Map[String, String] = Map([])
   let edges = match get_all_dependencies(storage) {
     Result::Ok(edges) => edges
     Result::Err(e) => return Result::Err(e)
@@ -1186,6 +1233,9 @@ pub fn load_issue_facts(
       Option::None => 0
     }
     dependent_counts.set(edge.depends_on, dependents + 1)
+    if edge.type_ == "parent-child" {
+      parents.set(edge.issue_id, edge.depends_on)
+    }
   }
 
   let facts : Map[String, IssueFacts] = Map([])
@@ -1203,6 +1253,7 @@ pub fn load_issue_facts(
         Option::Some(count) => count
         Option::None => 0
       },
+      parent_id: parents.get(issue.id),
     })
   }
   Result::Ok(facts)

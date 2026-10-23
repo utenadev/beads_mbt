@@ -1627,3 +1627,55 @@ test "storage: comments carry their author and a real id" {
     Err(_) => assert_eq(true, false)
   }
 }
+
+///|
+/// The parent id of an issue, or "" when it has none.
+fn parent_of(storage : @lib.BeadsStorage, id : String) -> String {
+  match @lib.get_parent_id(storage, id) {
+    Ok(Option::Some(parent)) => parent
+    Ok(Option::None) => ""
+    Err(_) => abort("get_parent_id returned an error")
+  }
+}
+
+///|
+test "storage: set_parent writes one parent-child edge and clears it" {
+  match open_fresh("/tmp/beads_test_parent.db") {
+    Ok(storage) => {
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p1", "Parent")))
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p2", "Child")))
+      ignore(
+        @lib.insert_issue(storage, @lib.make_issue("bd-p3", "Other parent")),
+      )
+      assert_eq(parent_of(storage, "bd-p2"), "")
+
+      ignore(@lib.set_parent(storage, "bd-p2", Option::Some("bd-p1")))
+      assert_eq(parent_of(storage, "bd-p2"), "bd-p1")
+
+      // reparenting replaces the edge instead of adding a second one
+      ignore(@lib.set_parent(storage, "bd-p2", Option::Some("bd-p3")))
+      assert_eq(parent_of(storage, "bd-p2"), "bd-p3")
+      match
+        @lib.load_issue_facts(storage, [@lib.make_issue("bd-p2", "Child")]) {
+        Ok(facts) =>
+          match facts.get("bd-p2") {
+            Some(entry) => assert_eq(entry.dependency_count, 1)
+            None => assert_eq(true, false)
+          }
+        Err(_) => assert_eq(true, false)
+      }
+
+      // the child inherits its parent's blockers through the edge
+      ignore(@lib.insert_issue(storage, @lib.make_issue("bd-p4", "Blocker")))
+      ignore(@lib.add_dependency(storage, "bd-p3", "bd-p4", "blocks"))
+      assert_eq(is_blocked_or_fail(storage, "bd-p2"), true)
+
+      // clearing the parent drops the edge and the inherited block
+      ignore(@lib.set_parent(storage, "bd-p2", Option::None))
+      assert_eq(parent_of(storage, "bd-p2"), "")
+      assert_eq(is_blocked_or_fail(storage, "bd-p2"), false)
+      @lib.close(storage)
+    }
+    Err(_) => assert_eq(true, false)
+  }
+}

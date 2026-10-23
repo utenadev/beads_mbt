@@ -48,12 +48,15 @@ bm init
 bm create "Issue のタイトル"
 bm create "Issue のタイトル" --priority P1 --type bug
 bm create "Issue のタイトル" --estimate 30 --due +2d --external-ref gh-123
+bm create "子 Issue" --parent bd-xxxxxx
 ```
 `--priority` は `0`〜`4` または `P0`〜`P4`、`--type` は
 `bug` / `feature` / `task` / `documentation`（`docs` も可）/ `question` / `other`
 を受け付けます。`--estimate` は分単位の見積り、`--external-ref` は GitHub の
 Issue 番号などの外部参照、`--due` は `YYYY-MM-DD`（09:00 UTC）、
 `YYYY-MM-DDTHH:MM:SSZ`、`+Nd`/`+Nw`/`+Nh`、`tomorrow` を受け付けます。
+`--parent` は `parent-child` 依存エッジを保存するため、子は親のブロッカーを
+継承します。`bm show` は `Parent:` を表示し、JSON は `parent_id` を出力します。
 
 ### Issue 一覧表示
 ```bash
@@ -75,6 +78,8 @@ bm update "bd-xxxxxx" --title "新しいタイトル"
 bm update "bd-xxxxxx" --priority 2
 bm update "bd-xxxxxx" --estimate 45 --due 2026-11-01 --external-ref gh-123
 bm update "bd-xxxxxx" --due ""      # 空文字は値をクリアします
+bm update "bd-xxxxxx" --parent bd-yyyyyy
+bm update "bd-xxxxxx" --parent ""   # 親エッジを削除します
 ```
 
 ### Issue 完了
@@ -210,8 +215,8 @@ bm list --json --fields id,title,labels,dependency_count,dependent_count
 
 指定できる名前: `id`, `title`, `description`, `status`, `priority`,
 `issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
-`external_ref`, `estimated_minutes`, `due_at`, `defer_until`, `created_at`,
-`updated_at`, `labels`, `dependency_count`, `dependent_count`。
+`external_ref`, `estimated_minutes`, `due_at`, `defer_until`, `parent_id`,
+`created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`。
 `labels` と依存件数は追加クエリが必要なため、指定されたときだけ読み込みます。
 `bm ready --brief` は
 `id,title,status,priority,issue_type,created_at,updated_at`
