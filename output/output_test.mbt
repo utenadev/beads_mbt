@@ -67,7 +67,7 @@ test "output: @output.parse_fields rejects unknown and empty names" {
 test "output: supported fields cover the documented names" {
   assert_eq(
     @output.supported_fields_text(),
-    "id, title, description, status, priority, issue_type, assignee, owner, acceptance_criteria, prerequisites, external_ref, estimated_minutes, due_at, created_at, updated_at, labels, dependency_count, dependent_count",
+    "id, title, description, status, priority, issue_type, assignee, owner, acceptance_criteria, prerequisites, external_ref, estimated_minutes, due_at, defer_until, created_at, updated_at, labels, dependency_count, dependent_count",
   )
 }
 
@@ -75,7 +75,7 @@ test "output: supported fields cover the documented names" {
 test "output: the default projection is the issue row" {
   assert_eq(
     @output.default_fields().join(","),
-    "id,title,description,status,priority,issue_type,assignee,owner,acceptance_criteria,prerequisites,external_ref,estimated_minutes,due_at,created_at,updated_at",
+    "id,title,description,status,priority,issue_type,assignee,owner,acceptance_criteria,prerequisites,external_ref,estimated_minutes,due_at,defer_until,created_at,updated_at",
   )
   assert_eq(@output.needs_issue_facts(@output.default_fields()), false)
   assert_eq(@output.needs_issue_facts(["id", "labels"]), true)

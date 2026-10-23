@@ -91,7 +91,16 @@ bm ready --brief
 ### Issue 延期
 ```bash
 bm defer "bd-xxxxxx"
+bm defer "bd-xxxxxx" --until 2026-11-01
+bm undefer "bd-xxxxxx"
 ```
+`bm defer` は Issue を `deferred` にします。`--until` を付けると `defer_until`
+の時間ゲートも設定します。未来のゲートはステータスが `open` のままでも
+`bm ready` から除外するため、`bm create "..." --defer 2026-11-01` や
+`bm update <id> --defer 2026-11-01`（空文字でクリア）で作業を予約できます。
+`bm ready --include-deferred` はゲート済みのバックログも表示し、`bm show` は
+`Deferred until:` を出力します。`bm undefer` はゲートを消し、`deferred` の
+Issue を `open` に戻します。
 
 ### ブロック中 Issue 表示
 ```bash
@@ -133,8 +142,11 @@ bm label list-all
 ### コメントの管理
 ```bash
 bm comments add "bd-xxxxxx" "コメント本文"
+bm comments add "bd-xxxxxx" "コメント本文" --author alice
 bm comments list "bd-xxxxxx"
 ```
+`--author` の既定値は `bm` です。`bm comments list --json` はコメントごとに
+`id` / `issue_id` / `author` / `text` / `created_at` を持つオブジェクトを出力します。
 
 ## 機械可読出力
 
@@ -198,7 +210,8 @@ bm list --json --fields id,title,labels,dependency_count,dependent_count
 
 指定できる名前: `id`, `title`, `description`, `status`, `priority`,
 `issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
-`created_at`, `updated_at`, `labels`, `dependency_count`, `dependent_count`。
+`external_ref`, `estimated_minutes`, `due_at`, `defer_until`, `created_at`,
+`updated_at`, `labels`, `dependency_count`, `dependent_count`。
 `labels` と依存件数は追加クエリが必要なため、指定されたときだけ読み込みます。
 `bm ready --brief` は
 `id,title,status,priority,issue_type,created_at,updated_at`

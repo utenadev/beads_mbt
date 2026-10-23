@@ -268,6 +268,18 @@ fn change_label(
 }
 
 ///|
+/// One comment as the beads_rust JSON shape: `text` holds the body.
+fn comment_json(comment : @lib.IssueComment) -> Json {
+  let entries : Map[String, Json] = Map([])
+  entries.set("id", Json::number(comment.id.to_double()))
+  entries.set("issue_id", Json::string(comment.issue_id))
+  entries.set("author", Json::string(comment.author))
+  entries.set("text", Json::string(comment.body))
+  entries.set("created_at", Json::number(comment.created_at.to_double()))
+  Json::object(entries)
+}
+
+///|
 /// A JSON array of strings.
 fn strings_json(values : Array[String]) -> Json {
   let rows : Array[Json] = []
@@ -299,16 +311,34 @@ fn handle_comments_command(ctx : Context) -> Int32 {
       }
       let issue = ctx.args[3]
       let body = ctx.args[4]
+      let mut author = "bm"
+      let mut index = 5
+      while index < ctx.args.length() {
+        let arg = ctx.args[index]
+        if arg == "--author" {
+          if index + 1 >= ctx.args.length() {
+            return fail(ctx, missing_value_error(arg))
+          }
+          author = ctx.args[index + 1]
+          index += 2
+        } else if is_flag(arg) {
+          return fail(ctx, unknown_option_error(arg))
+        } else {
+          index += 1
+        }
+      }
       with_storage(ctx, fn(storage) {
-        match @lib.add_comment(storage, issue, body) {
+        match @lib.add_comment(storage, issue, body, author~) {
           Result::Err(e) => Result::Err(@output.storage_error(e))
-          Result::Ok(_) => {
+          Result::Ok(id) => {
             match ctx.mode {
               OutputMode::Text => println("Comment added to " + issue)
               OutputMode::Json => {
                 let entries : Map[String, Json] = Map([])
+                entries.set("id", Json::number(id.to_double()))
                 entries.set("issue_id", Json::string(issue))
-                entries.set("body", Json::string(body))
+                entries.set("author", Json::string(author))
+                entries.set("text", Json::string(body))
                 emit_json(Json::object(entries))
               }
             }
@@ -338,11 +368,24 @@ fn handle_comments_command(ctx : Context) -> Int32 {
                   println("")
                   let mut i = 0
                   while i < comments.length() {
-                    println((i + 1).to_string() + ". " + comments[i])
+                    let comment = comments[i]
+                    println(
+                      (i + 1).to_string() +
+                      ". [" +
+                      comment.author +
+                      "] " +
+                      comment.body,
+                    )
                     i = i + 1
                   }
                 }
-              OutputMode::Json => emit_json(strings_json(comments))
+              OutputMode::Json => {
+                let rows : Array[Json] = []
+                for comment in comments {
+                  Array::push(rows, comment_json(comment))
+                }
+                emit_json(Json::array(rows))
+              }
             }
             Result::Ok(())
           }

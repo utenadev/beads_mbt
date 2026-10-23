@@ -76,6 +76,7 @@ fn issue_field_json(
     "external_ref" => optional_json(issue.external_ref)
     "estimated_minutes" => optional_int_json(issue.estimate)
     "due_at" => optional_int_json(issue.due_date)
+    "defer_until" => optional_int_json(issue.defer_until)
     "created_at" => Json::number(issue.created_at.to_double())
     "updated_at" => Json::number(issue.updated_at.to_double())
     "labels" =>

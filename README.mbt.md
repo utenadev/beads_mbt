@@ -99,7 +99,16 @@ bm ready --brief
 ### Defer Issue
 ```bash
 bm defer "bd-xxxxxx"
+bm defer "bd-xxxxxx" --until 2026-11-01
+bm undefer "bd-xxxxxx"
 ```
+`bm defer` moves the issue to `deferred`; `--until` also sets the `defer_until`
+time gate. A future gate keeps the issue out of `bm ready` even while its status
+is `open` — schedule work with `bm create "..." --defer 2026-11-01` or
+`bm update <id> --defer 2026-11-01` (an empty value clears it). `bm ready
+--include-deferred` shows the gated backlog, and `bm show` prints
+`Deferred until:`. `bm undefer` clears the gate and puts a deferred issue back
+to `open`.
 
 ### Show Blocked Issues
 ```bash
@@ -142,8 +151,11 @@ bm label list-all
 ### Manage Comments
 ```bash
 bm comments add "bd-xxxxxx" "Comment body"
+bm comments add "bd-xxxxxx" "Comment body" --author alice
 bm comments list "bd-xxxxxx"
 ```
+`--author` defaults to `bm`. `bm comments list --json` writes one object per
+comment with `id`, `issue_id`, `author`, `text`, and `created_at`.
 
 ## Machine-readable output
 
@@ -210,8 +222,8 @@ bm list --json --fields id,title,labels,dependency_count,dependent_count
 
 Supported names: `id`, `title`, `description`, `status`, `priority`,
 `issue_type`, `assignee`, `owner`, `acceptance_criteria`, `prerequisites`,
-`external_ref`, `estimated_minutes`, `due_at`, `created_at`, `updated_at`,
-`labels`, `dependency_count`, `dependent_count`.
+`external_ref`, `estimated_minutes`, `due_at`, `defer_until`, `created_at`,
+`updated_at`, `labels`, `dependency_count`, `dependent_count`.
 `labels` and the dependency counts need extra queries, so they are only loaded
 when a projection asks for them. `bm ready --brief` selects
 `id,title,status,priority,issue_type,created_at,updated_at`, which is what the

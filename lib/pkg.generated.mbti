@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub fn add_comment(BeadsStorage, String, String) -> Result[Int32, String]
+pub fn add_comment(BeadsStorage, String, String, author? : String) -> Result[Int32, String]
 
 pub fn add_dependency(BeadsStorage, String, String, String) -> Result[Unit, String]
 
@@ -36,7 +36,7 @@ pub fn get_blocked_issues(BeadsStorage) -> Result[Array[Issue], String]
 
 pub fn get_blocked_issues_with_blockers(BeadsStorage) -> Result[Array[BlockedIssue], String]
 
-pub fn get_comments(BeadsStorage, String) -> Result[Array[String], String]
+pub fn get_comments(BeadsStorage, String) -> Result[Array[IssueComment], String]
 
 pub fn get_config(BeadsStorage, String) -> Result[String?, String]
 
@@ -46,7 +46,7 @@ pub fn get_issue_by_id(BeadsStorage, String) -> Result[Issue?, String]
 
 pub fn get_labels(BeadsStorage, String) -> Result[Array[String], String]
 
-pub fn get_ready_issues(BeadsStorage) -> Result[Array[Issue], String]
+pub fn get_ready_issues(BeadsStorage, include_deferred? : Bool) -> Result[Array[Issue], String]
 
 pub fn init_workspace(String, String?) -> Result[String, String]
 
@@ -62,7 +62,7 @@ pub fn list_issues(BeadsStorage) -> Result[Array[Issue], String]
 
 pub fn load_issue_facts(BeadsStorage, Array[Issue]) -> Result[Map[String, IssueFacts], String]
 
-pub fn make_issue(String, String, issue_type? : IssueType, priority? : Int32, external_ref? : String?, estimate? : Int32?, due_date? : Int32?) -> Issue
+pub fn make_issue(String, String, issue_type? : IssueType, priority? : Int32, external_ref? : String?, estimate? : Int32?, due_date? : Int32?, defer_until? : Int32?) -> Issue
 
 pub fn open(String) -> Result[BeadsStorage, String]
 
@@ -91,6 +91,10 @@ pub fn status_to_string(Status) -> String
 pub fn string_to_issue_type(String) -> IssueType
 
 pub fn string_to_status(String) -> Status
+
+pub fn undefer_issue(BeadsStorage, String) -> Result[Unit, String]
+
+pub fn update_issue_defer_until(BeadsStorage, String, Int32?) -> Result[Unit, String]
 
 pub fn update_issue_due_date(BeadsStorage, String, Int32?) -> Result[Unit, String]
 
@@ -136,9 +140,18 @@ pub(all) struct Issue {
   external_ref : String?
   estimate : Int32?
   due_date : Int32?
+  defer_until : Int32?
   created_at : Int32
   updated_at : Int32
   is_ephemeral : Bool
+}
+
+pub(all) struct IssueComment {
+  id : Int32
+  issue_id : String
+  author : String
+  body : String
+  created_at : Int32
 }
 
 pub(all) struct IssueFacts {
